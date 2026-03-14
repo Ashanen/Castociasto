@@ -59,3 +59,6 @@ include(":shared:feature:categories:ui")
 include(":shared:feature:favorites:domain")
 include(":shared:feature:favorites:data")
 include(":shared:feature:favorites:ui")
+
+// E2E Tests (Appium)
+include(":e2e")
