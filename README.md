@@ -7,6 +7,7 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 - [Architecture Overview](#architecture-overview)
 - [Module Structure](#module-structure)
 - [Dependency Flow](#dependency-flow)
+- [Feature Isolation](#feature-isolation)
 - [Clean Architecture Layers](#clean-architecture-layers)
 - [MVI Pattern](#mvi-pattern)
 - [SOLID Principles](#solid-principles)
@@ -23,30 +24,30 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 
 ```mermaid
 graph TB
-    subgraph Platform["Platform Layer - Native UI"]
-        Android[Android App - Jetpack Compose]
-        iOS[iOS App - SwiftUI]
+    subgraph Platform["Platform - Native UI"]
+        Android[Android - Jetpack Compose]
+        iOS[iOS - SwiftUI]
     end
 
-    subgraph Shared["Shared KMP Modules"]
-        App[shared:app - DI aggregation + iOS export]
+    subgraph Shared["Shared KMP"]
+        App[shared:app]
 
         subgraph Feature1["feature:items"]
-            IU[ui]
-            IDom[domain]
-            IData[data]
+            IU[items:ui]
+            IDom[items:domain]
+            IData[items:data]
         end
 
         subgraph Feature2["feature:categories"]
-            CU[ui]
-            CDom[domain]
-            CData[data]
+            CU[categories:ui]
+            CDom[categories:domain]
+            CData[categories:data]
         end
 
         subgraph Feature3["feature:favorites"]
-            FU[ui]
-            FDom[domain]
-            FData[data]
+            FU[favorites:ui]
+            FDom[favorites:domain]
+            FData[favorites:data]
         end
 
         subgraph Core["Core - Domain Contracts"]
@@ -55,8 +56,8 @@ graph TB
             CoreFav[core:favorites]
         end
 
-        Infra[Infrastructure - Networking]
-        Foundation[Foundation - BaseViewModel, Exceptions]
+        Infra[infrastructure:networking]
+        Found[foundation]
     end
 
     Android --> App
@@ -64,19 +65,25 @@ graph TB
 
     IU --> CoreItems
     IDom --> CoreItems
+    IDom --> CoreFav
     IData --> CoreItems
     IData --> Infra
 
     CU --> CoreCat
     CDom --> CoreCat
+    CData --> CoreCat
 
+    FU --> CoreItems
     FU --> CoreFav
+    FDom --> CoreItems
     FDom --> CoreFav
+    FData --> CoreFav
 
-    CoreItems --> Foundation
-    CoreCat --> Foundation
-    CoreFav --> Foundation
-    Infra --> Foundation
+    CoreFav --> CoreItems
+    CoreItems --> Found
+    CoreCat --> Found
+    CoreFav --> Found
+    Infra --> Found
 ```
 
 ---
@@ -94,22 +101,22 @@ Castociasto/
     ├── foundation/                      # Base types: BaseViewModel, exceptions, extensions
     ├── infrastructure/
     │   └── networking/                  # Ktor HTTP client, safeApiCall, JSON config
-    ├── core/                            # API contracts (interfaces only, no implementations)
+    ├── core/                            # Domain contracts (interfaces + models, no implementations)
     │   ├── items/                       # ItemRepository, GetItemsUseCase, Item model
     │   ├── categories/                  # CategoryRepository, GetCategoriesUseCase, Category model
-    │   └── favorites/                   # FavoriteRepository, ToggleFavoriteUseCase
-    └── feature/                         # Feature implementations (domain/data/ui per feature)
+    │   └── favorites/                   # FavoriteRepository, ToggleFavoriteUseCase (depends on core:items)
+    └── feature/                         # Implementations (domain/data/ui per feature, fully isolated)
         ├── items/
         │   ├── domain/                  # GetItemsUseCaseImpl, GetItemUseCaseImpl
-        │   ├── data/                    # ApiItemRepository (Ktor)
+        │   ├── data/                    # ApiItemRepository (Ktor HTTP)
         │   └── ui/                      # ListViewModel, DetailViewModel, MVI contracts
         ├── categories/
         │   ├── domain/                  # GetCategoriesUseCaseImpl
-        │   ├── data/                    # FakeCategoryRepository
+        │   ├── data/                    # FakeCategoryRepository (in-memory)
         │   └── ui/                      # CategoriesViewModel
         └── favorites/
             ├── domain/                  # ToggleFavoriteUseCaseImpl
-            ├── data/                    # FakeFavoriteRepository
+            ├── data/                    # FakeFavoriteRepository (in-memory)
             └── ui/                      # FavoritesViewModel
 ```
 
@@ -117,39 +124,58 @@ Castociasto/
 
 ## Dependency Flow
 
-The dependency graph strictly enforces that **inner layers never depend on outer layers** and **feature modules are fully isolated from each other**.
+Within each feature, **UI, Domain, and Data are independent siblings**. They all depend on Core (domain contracts) but **never on each other**:
 
 ```mermaid
 graph TB
+    subgraph "Within a single feature"
+        UI[ui] -->|depends on| CORE[core]
+        DOM[domain] -->|implements| CORE
+        DAT[data] -->|implements| CORE
+    end
+```
+
+This is the key architectural rule — **the dependency arrows from UI and Data both point inward toward Core**:
+
+- `ui` depends on Core to read use case interfaces and models
+- `domain` depends on Core to implement use case interfaces (using repository interfaces)
+- `data` depends on Core to implement repository interfaces
+
+**UI never knows about Data. Data never knows about UI. Neither knows about Domain implementations.** They are wired together only at runtime through Koin DI.
+
+---
+
+## Feature Isolation
+
+Feature modules **cannot depend on other feature modules**. Each feature is a self-contained vertical slice with its own `ui`, `domain`, and `data` layers.
+
+```mermaid
+graph LR
     subgraph Items["feature:items"]
-        IU[items:ui]
-        ID[items:domain]
-        IData[items:data]
+        IU[ui]
+        ID[domain]
+        IData[data]
     end
 
     subgraph Categories["feature:categories"]
-        CU[categories:ui]
-        CD[categories:domain]
-        CData[categories:data]
+        CU[ui]
+        CD[domain]
+        CData[data]
     end
 
     subgraph Favorites["feature:favorites"]
-        FU[favorites:ui]
-        FD[favorites:domain]
-        FData[favorites:data]
+        FU[ui]
+        FD[domain]
+        FData[data]
     end
 
     CoreItems[core:items]
     CoreCat[core:categories]
     CoreFav[core:favorites]
-    Infra[infrastructure:networking]
-    Found[foundation]
 
     IU --> CoreItems
     ID --> CoreItems
-    ID --> CoreFav
     IData --> CoreItems
-    IData --> Infra
 
     CU --> CoreCat
     CD --> CoreCat
@@ -158,55 +184,36 @@ graph TB
     FU --> CoreFav
     FD --> CoreFav
     FData --> CoreFav
-
-    CoreItems --> Found
-    CoreCat --> Found
-    CoreFav --> Found
-    Infra --> Found
 ```
 
-Key constraints:
-- **Feature modules are isolated** — `feature:items` never depends on `feature:categories` or `feature:favorites`
-- **Core (Domain) is the center** — it defines contracts (interfaces), models, and use case signatures that UI and Data implement
-- **UI and Data point inward** — they depend on Core abstractions, never on each other
-- **Domain** never imports Data or Infrastructure
-- **Data** never imports Domain or UI
-- **UI** never imports Data
-- **Core** never imports Koin, Ktor, or any implementation detail — enforced by Gradle plugins
-- Cross-feature communication (e.g., items needing favorites) happens through **Core interfaces**, not feature implementations
+When features need to share concepts (e.g., the favorites feature needs the `Item` model from items), they communicate through **Core modules** — never through each other's implementations. For example, `core:favorites` depends on `core:items`, and `favorites:domain` depends on both `core:favorites` and `core:items`.
 
 ---
 
 ## Clean Architecture Layers
 
-The **Core (Domain)** layer is the independent center of the architecture. It owns all contracts, models, and use case signatures. The outer layers (UI and Data) depend on it — never the reverse.
+The **Core** layer is the independent center. It defines all contracts, models, and use case signatures. Everything else depends on it — it depends on nothing (except Foundation base types).
 
 ```mermaid
 graph TB
-    UI[UI Layer - ViewModels, MVI Contracts] -->|depends on| Core
-    Data[Data Layer - Repositories, DTOs, API] -->|implements| Core
-    Domain[Domain Layer - Use Case Implementations] -->|implements| Core
+    UI[UI - ViewModels, MVI] -->|depends on| Core
+    DomImpl[Domain Impl - Use Cases] -->|implements| Core
+    Data[Data - Repositories] -->|implements| Core
 
-    Core[Core - Interfaces, Models, Use Case Signatures]
-    Core -->|uses| Foundation[Foundation - BaseViewModel, Exceptions]
-    Data -->|uses| Infra[Infrastructure - Networking]
-    Infra -->|uses| Foundation
+    Core[Core - Contracts, Models, Interfaces]
+    Core --> Found[Foundation]
+    Data -->|uses| Infra[Infrastructure]
+    Infra --> Found
 ```
 
-The **Domain layer** (`core/*`) is completely independent:
-- It defines **what** the app does (interfaces, models, use case contracts)
-- It has **zero knowledge** of how data is fetched or how UI is rendered
-- It depends only on Foundation (base types) and Kotlin Coroutines
-- UI and Data layers implement its contracts and point inward toward it
-
-| Layer | Module | Responsibility | Depends On |
-|-------|--------|---------------|------------|
-| **Core (Domain)** | `shared/core/*` | Interfaces, models, use case signatures | Foundation, Coroutines |
-| **Domain Impl** | `shared/feature/*/domain` | Use case implementations, business rules | Core, Foundation |
-| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Core, Infrastructure |
-| **UI** | `shared/feature/*/ui` | ViewModels, MVI state machines | Core, Foundation |
-| **Infrastructure** | `shared/infrastructure/networking` | HTTP client, error mapping, serialization | Foundation, Ktor |
-| **Foundation** | `shared/foundation` | Base types, exceptions, flow extensions | Coroutines, Lifecycle |
+| Layer | Module | Role | Depends On |
+|-------|--------|------|------------|
+| **Core** | `shared/core/*` | Defines interfaces, models, use case signatures. Owns the domain. | Foundation |
+| **Domain Impl** | `shared/feature/*/domain` | Implements use case interfaces from Core | Core, Foundation |
+| **Data** | `shared/feature/*/data` | Implements repository interfaces from Core | Core, Infrastructure |
+| **UI** | `shared/feature/*/ui` | Consumes use case interfaces from Core via ViewModels | Core, Foundation |
+| **Infrastructure** | `shared/infrastructure/networking` | HTTP client, error mapping, serialization | Foundation |
+| **Foundation** | `shared/foundation` | BaseViewModel, exception hierarchy, flow extensions | — |
 
 ---
 
@@ -225,8 +232,8 @@ sequenceDiagram
     VM->>VM: _uiState.update { copy(isLoading = true) }
     VM->>UC: getItems()
     UC->>Repo: repository.getItems()
-    Repo-->>UC: List<Item>
-    UC-->>VM: Flow<List<Item>>
+    Repo-->>UC: List of Items
+    UC-->>VM: Flow of Items
     VM->>VM: _uiState.update { copy(items, isLoading = false) }
     VM-->>View: uiState (StateFlow)
 
@@ -293,7 +300,7 @@ Each module and class has exactly one reason to change:
 
 ### Open/Closed Principle (OCP)
 
-- New features (e.g., a "bookmarks" feature) are added by creating new modules — no existing code is modified
+- New features are added by creating new modules — no existing code is modified
 - The `CastociastoException` sealed hierarchy is extensible with new exception categories
 - New use cases implement existing `fun interface` contracts without changing consumers
 
@@ -316,17 +323,13 @@ Each module and class has exactly one reason to change:
 
 ### Dependency Inversion (DIP)
 
-- **High-level modules** (Domain, UI) depend on **abstractions** defined in Core
-- **Low-level modules** (Data, Infrastructure) implement those abstractions
-- The dependency arrow always points **inward** toward Core
-
-See the [Dependency Inversion](#dependency-inversion) section below for details.
+All outer layers (UI, Domain Impl, Data) depend on **abstractions defined in Core**. Core never depends on implementations. See the [Dependency Inversion](#dependency-inversion) section for details.
 
 ---
 
 ## Dependency Inversion
 
-Dependency Inversion is the architectural backbone of this project. The **Core (Domain) layer** is fully independent — it defines all contracts, models, and use case signatures. The outer layers (UI, Data, Domain Impl) all point inward toward Core and implement its abstractions.
+Core defines contracts. UI, Domain, and Data all implement or consume those contracts. None of them know about each other — only about Core.
 
 ```mermaid
 graph TB
@@ -342,7 +345,7 @@ graph TB
         AIR[ApiItemRepository]
     end
 
-    subgraph "core:items - Independent, owns all contracts"
+    subgraph "core:items"
         GIU[fun interface GetItemsUseCase]
         IR[interface ItemRepository]
         IM[data class Item]
@@ -356,7 +359,7 @@ graph TB
 
 ### How it works in practice
 
-1. **Core** defines the interface:
+1. **Core** defines the contracts (interfaces + models):
    ```kotlin
    // shared/core/items — no implementation, no Koin, no Ktor
    interface ItemRepository {
@@ -365,7 +368,7 @@ graph TB
    }
    ```
 
-2. **Data** provides the implementation:
+2. **Data** implements the repository interface from Core:
    ```kotlin
    // shared/feature/items/data — implements the core interface
    internal class ApiItemRepository(
@@ -373,28 +376,36 @@ graph TB
    ) : ItemRepository { ... }
    ```
 
-3. **Domain** depends on the abstraction, not the implementation:
+3. **Domain** implements the use case interface from Core, depending on the repository interface (not implementation):
    ```kotlin
-   // shared/feature/items/domain — depends only on ItemRepository interface
+   // shared/feature/items/domain — depends only on interfaces from core
    internal class GetItemsUseCaseImpl(
        private val repository: ItemRepository,  // interface from core
    ) : GetItemsUseCase { ... }
    ```
 
-4. **Koin** wires it together at runtime:
+4. **UI** depends on the use case interface from Core (not the implementation):
    ```kotlin
-   // Data module registers: interface → implementation
+   // shared/feature/items/ui — depends only on interfaces from core
+   class ListViewModel(
+       private val getItems: GetItemsUseCase,  // interface from core
+   ) : BaseViewModel<ListState, ListAction, ListSideEffect>() { ... }
+   ```
+
+5. **Koin** wires it all together at runtime:
+   ```kotlin
    val itemsDataModule = module {
        single<ItemRepository> { ApiItemRepository(get()) }
    }
-
-   // Domain module consumes: interface only
    val itemsDomainModule = module {
        factory<GetItemsUseCase> { GetItemsUseCaseImpl(get()) }
    }
+   val itemsUiModule = module {
+       viewModelOf(::ListViewModel)
+   }
    ```
 
-5. **Gradle plugins** enforce boundaries at compile time — `domain` cannot import `data`, `core` cannot import Koin.
+6. **Gradle plugins** enforce these boundaries at compile time — `ui` cannot import `data`, `domain` cannot import `data`, `core` cannot import Koin or Ktor.
 
 ---
 
@@ -404,30 +415,15 @@ Errors are modeled as a **sealed exception hierarchy** that flows from the infra
 
 ```mermaid
 graph TB
-    subgraph "Exception Hierarchy"
-        CE["CastociastoException"]
-        NE["NetworkException"]
-        DE["DataException"]
-
-        U["Unauthorized"]
-        F["Forbidden"]
-        NF["NotFound"]
-        SE["ServerError(detail)"]
-        NC["NoConnection(detail)"]
-        UNK["Unknown(detail)"]
-
-        DNF["DataException.NotFound(detail)"]
-    end
-
-    CE --> NE
-    CE --> DE
-    NE --> U
-    NE --> F
-    NE --> NF
-    NE --> SE
-    NE --> NC
-    NE --> UNK
-    DE --> DNF
+    CE[CastociastoException] --> NE[NetworkException]
+    CE --> DE[DataException]
+    NE --> U[Unauthorized]
+    NE --> F[Forbidden]
+    NE --> NF[NotFound]
+    NE --> SE[ServerError]
+    NE --> NC[NoConnection]
+    NE --> UNK[Unknown]
+    DE --> DNF[DataException.NotFound]
 ```
 
 ### Error Flow Through Layers
@@ -436,9 +432,9 @@ graph TB
 sequenceDiagram
     participant Ktor as Ktor HTTP Client
     participant Safe as safeApiCall()
-    participant Repo as Repository (Data)
-    participant UC as UseCase (Domain)
-    participant VM as ViewModel (UI)
+    participant Repo as Repository
+    participant UC as UseCase
+    participant VM as ViewModel
     participant View as View
 
     Ktor->>Safe: ClientRequestException (404)
@@ -446,7 +442,7 @@ sequenceDiagram
     Safe->>Repo: throw NetworkException.NotFound
 
     alt Repository handles it
-        Repo->>Repo: catch NotFound → return null
+        Repo->>Repo: catch NotFound, return null
         Repo->>UC: null
         UC->>UC: throw DataException.NotFound
     else Repository propagates it
@@ -454,9 +450,9 @@ sequenceDiagram
     end
 
     UC->>VM: Flow emits error
-    VM->>VM: .launchWith(scope) { error → }
-    VM->>VM: _uiState.update { copy(error = error.message) }
-    VM->>View: uiState with error message
+    VM->>VM: launchWith catches error
+    VM->>VM: _uiState.update with error message
+    VM->>View: uiState with error
 ```
 
 ### Layer-by-layer error handling
@@ -480,12 +476,12 @@ suspend fun <T> safeApiCall(block: suspend () -> T): T {
 }
 ```
 
-**2. Data** — Repositories call `safeApiCall()` and may catch specific exceptions:
+**2. Data** — Repositories call `safeApiCall()` and may handle specific exceptions:
 ```kotlin
 override suspend fun getItem(id: String): Item? = try {
     safeApiCall { httpClient.get("posts/$id").body<PostDto>().toItem() }
 } catch (e: CastociastoException.NetworkException.NotFound) {
-    null  // 404 → null (expected case)
+    null  // 404 is expected — return null
 }
 ```
 
@@ -509,29 +505,33 @@ getItems()
 
 ## Dependency Injection
 
-**Koin** is used as the DI framework. Each architectural layer registers its own Koin module:
+**Koin** is used as the DI framework. Each layer registers its own module. Koin is the only place where implementations are linked to interfaces — the rest of the code only knows about abstractions.
 
 ```mermaid
 graph LR
-    subgraph "Koin Module Registration Order"
+    subgraph Infra
         NET[networkingModule]
+    end
 
+    subgraph Data
         ID[itemsDataModule]
         CD[categoriesDataModule]
         FD[favoritesDataModule]
+    end
 
+    subgraph Domain
         IDO[itemsDomainModule]
         CDO[categoriesDomainModule]
         FDO[favoritesDomainModule]
+    end
 
+    subgraph UI
         IU[itemsUiModule]
         CU[categoriesUiModule]
         FU[favoritesUiModule]
     end
 
     NET --> ID
-    NET --> CD
-    NET --> FD
     ID --> IDO
     CD --> CDO
     FD --> FDO
@@ -554,18 +554,18 @@ val appModules = listOf(
 
 ## Build Convention Plugins
 
-Custom Gradle plugins in `build-logic/convention/` enforce architectural boundaries at compile time:
+Custom Gradle plugins in `build-logic/convention/` enforce architectural boundaries at compile time. Each layer gets only the dependencies it needs — nothing more.
 
 | Plugin | Applied To | Provides | Restricts |
 |--------|-----------|----------|-----------|
-| `castociasto.kmp.library` | All shared modules | Coroutines | Base plugin only |
+| `castociasto.kmp.library` | All shared modules | KMP base setup | No framework dependencies |
 | `castociasto.kmp.api` | `core/*` | Coroutines | No Koin, no Ktor, no Lifecycle |
 | `castociasto.kmp.domain` | `feature/*/domain` | Coroutines, Koin | No Ktor, no Lifecycle |
 | `castociasto.kmp.data` | `feature/*/data` | Coroutines, Koin | No Lifecycle |
-| `castociasto.kmp.ui` | `feature/*/ui` | Coroutines, Koin, Lifecycle | — |
-| `castociasto.kmp.infra` | `infrastructure/*` | Ktor, Serialization | No Koin, no Lifecycle |
+| `castociasto.kmp.ui` | `feature/*/ui` | Coroutines, Koin, Lifecycle, ViewModel | — |
+| `castociasto.kmp.infra` | `infrastructure/*` | Ktor, Serialization, Koin | No Lifecycle |
 
-This means a `core` module **physically cannot** import Koin or Ktor — the dependency simply isn't on the classpath.
+This means a `core` module **physically cannot** import Koin or Ktor — the dependency simply isn't on the classpath. A `domain` module cannot import Ktor. These boundaries are enforced by the build system, not by convention.
 
 ---
 
