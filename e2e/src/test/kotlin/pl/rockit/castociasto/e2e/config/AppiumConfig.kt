@@ -8,7 +8,6 @@ object AppiumConfig {
     const val APP_ACTIVITY = ".MainActivity"
 
     // Timeout settings (seconds)
-    const val IMPLICIT_WAIT = 10L
     const val EXPLICIT_WAIT = 15L
 
     // Path to APK (relative to project root, set via env var or default)

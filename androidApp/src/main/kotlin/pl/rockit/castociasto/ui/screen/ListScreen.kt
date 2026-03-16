@@ -64,7 +64,7 @@ fun ListScreen(
         when {
             state.isLoading -> {
                 Box(
-                    modifier = Modifier.fillMaxSize().padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding).testTag("list_loading"),
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator()
@@ -72,7 +72,7 @@ fun ListScreen(
             }
             state.error != null -> {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding).testTag("list_error"),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -80,9 +80,10 @@ fun ListScreen(
                         state.error ?: "",
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.testTag("list_error_message"),
                     )
                     TextButton(onClick = { viewModel.onAction(ListAction.Refresh) }) {
-                        Text("Retry")
+                        Text("Retry", modifier = Modifier.testTag("list_retry_button"))
                     }
                 }
             }

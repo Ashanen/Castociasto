@@ -3,6 +3,8 @@ package pl.rockit.castociasto.e2e.test
 import org.junit.Test
 import pl.rockit.castociasto.e2e.base.BaseE2ETest
 import pl.rockit.castociasto.e2e.page.ListPage
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -11,7 +13,7 @@ import kotlin.test.assertTrue
  * These tests verify the full user journey:
  * 1. App launches to list screen
  * 2. Items load from API
- * 3. Tapping item navigates to detail
+ * 3. Tapping item navigates to detail with correct content
  * 4. Back navigation returns to list
  *
  * Prerequisites:
@@ -29,10 +31,7 @@ class ItemsFlowE2ETest : BaseE2ETest() {
         listPage.waitForItemsToLoad()
 
         assertTrue(listPage.isDisplayed(), "List screen should be displayed")
-        assertTrue(
-            listPage.getTitle() == "Castociasto",
-            "App title should be 'Castociasto'"
-        )
+        assertEquals("Castociasto", listPage.getTitle())
     }
 
     @Test
@@ -40,17 +39,19 @@ class ItemsFlowE2ETest : BaseE2ETest() {
         listPage.waitForItemsToLoad()
 
         val itemCount = listPage.getVisibleItemCount()
-        assertTrue(itemCount > 0, "List should display at least one item")
+        assertTrue(itemCount > 0, "List should display at least one item, got $itemCount")
     }
 
     @Test
-    fun tappingItemNavigatesToDetail() {
+    fun tappingItemShowsDetailWithContent() {
         listPage.waitForItemsToLoad()
 
         val detailPage = listPage.tapFirstItem()
         detailPage.waitForContent()
 
         assertTrue(detailPage.isDisplayed(), "Detail screen should be displayed")
+        assertTrue(detailPage.getTitle().isNotBlank(), "Detail title should not be blank")
+        assertTrue(detailPage.getSubtitle().isNotBlank(), "Detail subtitle should not be blank")
     }
 
     @Test
@@ -67,19 +68,29 @@ class ItemsFlowE2ETest : BaseE2ETest() {
     }
 
     @Test
-    fun fullBrowsingJourney() {
-        // Step 1: List loads
+    fun successfulLoadDoesNotShowError() {
         listPage.waitForItemsToLoad()
-        assertTrue(listPage.isDisplayed())
 
-        // Step 2: Navigate to detail
-        val detailPage = listPage.tapFirstItem()
-        detailPage.waitForContent()
-        assertTrue(detailPage.isDisplayed())
+        assertFalse(listPage.isErrorDisplayed(), "Error state should not be shown on successful load")
+        assertTrue(listPage.getVisibleItemCount() > 0, "Items should be visible")
+    }
 
-        // Step 3: Navigate back
-        val returnedList = detailPage.tapBack()
+    @Test
+    fun navigatingToDifferentItemsShowsDifferentContent() {
+        listPage.waitForItemsToLoad()
+
+        // Navigate to first item
+        val firstDetail = listPage.tapFirstItem()
+        firstDetail.waitForContent()
+        val firstTitle = firstDetail.getTitle()
+
+        // Go back and navigate to second item
+        val returnedList = firstDetail.tapBack()
         returnedList.waitForItemsToLoad()
-        assertTrue(returnedList.isDisplayed())
+        val secondDetail = returnedList.tapItemAt(1)
+        secondDetail.waitForContent()
+        val secondTitle = secondDetail.getTitle()
+
+        assertTrue(firstTitle != secondTitle, "Different items should have different titles")
     }
 }

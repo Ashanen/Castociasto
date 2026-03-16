@@ -34,8 +34,11 @@ class ListPage(private val driver: AndroidDriver) {
         return driver.findElements(anyItem).size
     }
 
-    fun tapFirstItem(): DetailPage {
-        wait.until(ExpectedConditions.elementToBeClickable(anyItem)).click()
+    fun tapFirstItem(): DetailPage = tapItemAt(0)
+
+    fun tapItemAt(index: Int): DetailPage {
+        val items = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(anyItem))
+        items[index].click()
         return DetailPage(driver)
     }
 
@@ -45,5 +48,27 @@ class ListPage(private val driver: AndroidDriver) {
         } catch (_: Exception) {
             false
         }
+    }
+
+    fun waitForError(): ListPage {
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_error")))
+        return this
+    }
+
+    fun isErrorDisplayed(): Boolean {
+        return try {
+            driver.findElement(By.id("list_error")).isDisplayed
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun getErrorMessage(): String {
+        return wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_error_message")))!!.text
+    }
+
+    fun tapRetry(): ListPage {
+        wait.until(ExpectedConditions.elementToBeClickable(By.id("list_retry_button"))).click()
+        return this
     }
 }
