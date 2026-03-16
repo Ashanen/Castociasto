@@ -63,21 +63,20 @@ graph TB
     Android --> App
     iOS --> App
 
-    IU --> CoreItems
+    IU --> IDom
+    IData --> IDom
     IDom --> CoreItems
     IDom --> CoreFav
-    IData --> CoreItems
     IData --> Infra
 
-    CU --> CoreCat
+    CU --> CDom
+    CData --> CDom
     CDom --> CoreCat
-    CData --> CoreCat
 
-    FU --> CoreItems
-    FU --> CoreFav
+    FU --> FDom
+    FData --> FDom
     FDom --> CoreItems
     FDom --> CoreFav
-    FData --> CoreFav
 
     CoreFav --> CoreItems
     CoreItems --> Found
@@ -101,21 +100,21 @@ Castociasto/
     ├── foundation/                      # Base types: BaseViewModel, exceptions, extensions
     ├── infrastructure/
     │   └── networking/                  # Ktor HTTP client, safeApiCall, JSON config
-    ├── core/                            # Domain contracts (interfaces + models, no implementations)
-    │   ├── items/                       # ItemRepository, GetItemsUseCase, Item model
-    │   ├── categories/                  # CategoryRepository, GetCategoriesUseCase, Category model
-    │   └── favorites/                   # FavoriteRepository, ToggleFavoriteUseCase (depends on core:items)
-    └── feature/                         # Implementations (domain/data/ui per feature, fully isolated)
+    ├── core/                            # Shared models + cross-feature repository interfaces
+    │   ├── items/                       # Item model, ItemRepository interface
+    │   ├── categories/                  # Category model, CategoryRepository interface
+    │   └── favorites/                   # FavoriteRepository interface (depends on core:items)
+    └── feature/                         # Features (domain/data/ui per feature, fully isolated)
         ├── items/
-        │   ├── domain/                  # GetItemsUseCaseImpl, GetItemUseCaseImpl
+        │   ├── domain/                  # GetItemsUseCase, GetItemUseCase + implementations
         │   ├── data/                    # ApiItemRepository (Ktor HTTP)
         │   └── ui/                      # ListViewModel, DetailViewModel, MVI contracts
         ├── categories/
-        │   ├── domain/                  # GetCategoriesUseCaseImpl
+        │   ├── domain/                  # GetCategoriesUseCase + implementation
         │   ├── data/                    # FakeCategoryRepository (in-memory)
         │   └── ui/                      # CategoriesViewModel
         └── favorites/
-            ├── domain/                  # ToggleFavoriteUseCaseImpl
+            ├── domain/                  # GetFavoritesUseCase, ToggleFavoriteUseCase + implementations
             ├── data/                    # FakeFavoriteRepository (in-memory)
             └── ui/                      # FavoritesViewModel
 ```
@@ -124,24 +123,24 @@ Castociasto/
 
 ## Dependency Flow
 
-Within each feature, **UI, Domain, and Data are independent siblings**. They all depend on Core (domain contracts) but **never on each other**:
+Within each feature, **UI and Data both depend on Domain**. Domain is the center — it owns use case interfaces and contracts. Core provides shared models and cross-feature repository interfaces that Domain depends on.
 
 ```mermaid
 graph TB
     subgraph "Within a single feature"
-        UI[ui] -->|depends on| CORE[core]
-        DOM[domain] -->|implements| CORE
-        DAT[data] -->|implements| CORE
+        UI[ui] -->|depends on| DOM[domain]
+        DAT[data] -->|depends on| DOM
+        DOM -->|depends on| CORE[core]
     end
 ```
 
-This is the key architectural rule — **the dependency arrows from UI and Data both point inward toward Core**:
+This is the key architectural rule — **UI → Domain ← Data**:
 
-- `ui` depends on Core to read use case interfaces and models
-- `domain` depends on Core to implement use case interfaces (using repository interfaces)
-- `data` depends on Core to implement repository interfaces
+- `ui` depends on Domain for use case interfaces (and Core for shared models)
+- `data` depends on Domain for repository contracts (and Core for shared models)
+- `domain` owns use case interfaces and depends on Core for models and cross-feature repository interfaces
 
-**UI never knows about Data. Data never knows about UI. Neither knows about Domain implementations.** They are wired together only at runtime through Koin DI.
+**UI never knows about Data. Data never knows about UI.** They are wired together only at runtime through Koin DI.
 
 ---
 
@@ -149,58 +148,51 @@ This is the key architectural rule — **the dependency arrows from UI and Data 
 
 Feature modules **cannot depend on other feature modules**. Each feature is a self-contained vertical slice with its own `ui`, `domain`, and `data` layers.
 
+**Within a single feature** — UI and Data both point to Domain:
+
 ```mermaid
-graph LR
-    subgraph Items["feature:items"]
-        IU[ui]
-        ID[domain]
-        IData[data]
+graph TB
+    subgraph "feature:categories (self-contained)"
+        CU[categories:ui] -->|depends on| CD[categories:domain]
+        CData[categories:data] -->|depends on| CD
+        CD -->|depends on| CoreCat[core:categories]
     end
-
-    subgraph Categories["feature:categories"]
-        CU[ui]
-        CD[domain]
-        CData[data]
-    end
-
-    subgraph Favorites["feature:favorites"]
-        FU[ui]
-        FD[domain]
-        FData[data]
-    end
-
-    CoreItems[core:items]
-    CoreCat[core:categories]
-    CoreFav[core:favorites]
-
-    IU --> CoreItems
-    ID --> CoreItems
-    IData --> CoreItems
-
-    CU --> CoreCat
-    CD --> CoreCat
-    CData --> CoreCat
-
-    FU --> CoreFav
-    FD --> CoreFav
-    FData --> CoreFav
 ```
 
-When features need to share concepts (e.g., the favorites feature needs the `Item` model from items), they communicate through **Core modules** — never through each other's implementations. For example, `core:favorites` depends on `core:items`, and `favorites:domain` depends on both `core:favorites` and `core:items`.
+**Cross-feature communication** — features never depend on each other directly. When `favorites` needs the `Item` model or `ItemRepository` from items, it goes through Core:
+
+```mermaid
+graph TB
+    subgraph "feature:favorites"
+        FU[favorites:ui] --> FDom[favorites:domain]
+        FData[favorites:data] --> FDom
+    end
+
+    subgraph "feature:items"
+        IU[items:ui] --> IDom[items:domain]
+        IData[items:data] --> IDom
+    end
+
+    FDom --> CoreFav[core:favorites]
+    FDom --> CoreItems[core:items]
+    IDom --> CoreItems
+    IDom --> CoreFav
+    CoreFav --> CoreItems
+```
+
+Features share concepts through **Core modules** — never through each other's domain, data, or ui implementations.
 
 ---
 
 ## Clean Architecture Layers
 
-The **Core** layer is the independent center. It defines all contracts, models, and use case signatures. Everything else depends on it — it depends on nothing (except Foundation base types).
+**Domain** is the center of each feature. It owns use case interfaces and implementations. UI and Data both depend on Domain. Core provides shared models and cross-feature repository interfaces.
 
 ```mermaid
 graph TB
-    UI[UI - ViewModels, MVI] -->|depends on| Core
-    DomImpl[Domain Impl - Use Cases] -->|implements| Core
-    Data[Data - Repositories] -->|implements| Core
-
-    Core[Core - Contracts, Models, Interfaces]
+    UI[UI - ViewModels, MVI] -->|depends on| Domain
+    Data[Data - Repositories] -->|depends on| Domain
+    Domain[Domain - Use Case Interfaces + Impls] -->|depends on| Core[Core - Shared Models + Repo Interfaces]
     Core --> Found[Foundation]
     Data -->|uses| Infra[Infrastructure]
     Infra --> Found
@@ -208,10 +200,10 @@ graph TB
 
 | Layer | Module | Role | Depends On |
 |-------|--------|------|------------|
-| **Core** | `shared/core/*` | Defines interfaces, models, use case signatures. Owns the domain. | Foundation |
-| **Domain Impl** | `shared/feature/*/domain` | Implements use case interfaces from Core | Core, Foundation |
-| **Data** | `shared/feature/*/data` | Implements repository interfaces from Core | Core, Infrastructure |
-| **UI** | `shared/feature/*/ui` | Consumes use case interfaces from Core via ViewModels | Core, Foundation |
+| **Domain** | `shared/feature/*/domain` | Use case interfaces, use case implementations, business rules | Core, Foundation |
+| **Core** | `shared/core/*` | Shared models and cross-feature repository interfaces | Foundation |
+| **UI** | `shared/feature/*/ui` | ViewModels, MVI state machines | Domain, Core, Foundation |
+| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Domain, Core, Infrastructure |
 | **Infrastructure** | `shared/infrastructure/networking` | HTTP client, error mapping, serialization | Foundation |
 | **Foundation** | `shared/foundation` | BaseViewModel, exception hierarchy, flow extensions | — |
 
@@ -323,13 +315,13 @@ Each module and class has exactly one reason to change:
 
 ### Dependency Inversion (DIP)
 
-All outer layers (UI, Domain Impl, Data) depend on **abstractions defined in Core**. Core never depends on implementations. See the [Dependency Inversion](#dependency-inversion) section for details.
+UI and Data depend on **abstractions defined in Domain**. Domain depends on Core for shared models and repository interfaces. No layer knows about another's implementations. See the [Dependency Inversion](#dependency-inversion) section for details.
 
 ---
 
 ## Dependency Inversion
 
-Core defines contracts. UI, Domain, and Data all implement or consume those contracts. None of them know about each other — only about Core.
+**Domain** owns use case interfaces. **Core** owns shared models and repository interfaces. UI and Data depend on Domain (and Core for models). None of them know about each other's implementations.
 
 ```mermaid
 graph TB
@@ -338,6 +330,7 @@ graph TB
     end
 
     subgraph "feature:items:domain"
+        GIU[fun interface GetItemsUseCase]
         GIUI[GetItemsUseCaseImpl]
     end
 
@@ -346,7 +339,6 @@ graph TB
     end
 
     subgraph "core:items"
-        GIU[fun interface GetItemsUseCase]
         IR[interface ItemRepository]
         IM[data class Item]
     end
@@ -359,37 +351,44 @@ graph TB
 
 ### How it works in practice
 
-1. **Core** defines the contracts (interfaces + models):
+1. **Core** defines shared models and cross-feature repository interfaces:
    ```kotlin
-   // shared/core/items — no implementation, no Koin, no Ktor
+   // shared/core/items — shared models + repository contract
+   data class Item(val id: String, val title: String, val subtitle: String, val isFavorite: Boolean = false)
+
    interface ItemRepository {
        suspend fun getItems(): List<Item>
        suspend fun getItem(id: String): Item?
    }
    ```
 
-2. **Data** implements the repository interface from Core:
+2. **Domain** defines use case interfaces and provides implementations:
    ```kotlin
-   // shared/feature/items/data — implements the core interface
-   internal class ApiItemRepository(
-       private val httpClient: HttpClient,
-   ) : ItemRepository { ... }
-   ```
+   // shared/feature/items/domain — use case interface (public)
+   fun interface GetItemsUseCase {
+       operator fun invoke(): Flow<List<Item>>
+   }
 
-3. **Domain** implements the use case interface from Core, depending on the repository interface (not implementation):
-   ```kotlin
-   // shared/feature/items/domain — depends only on interfaces from core
+   // shared/feature/items/domain — implementation (internal)
    internal class GetItemsUseCaseImpl(
        private val repository: ItemRepository,  // interface from core
    ) : GetItemsUseCase { ... }
    ```
 
-4. **UI** depends on the use case interface from Core (not the implementation):
+3. **UI** depends on Domain for use case interfaces:
    ```kotlin
-   // shared/feature/items/ui — depends only on interfaces from core
+   // shared/feature/items/ui — depends on domain for GetItemsUseCase
    class ListViewModel(
-       private val getItems: GetItemsUseCase,  // interface from core
+       private val getItems: GetItemsUseCase,  // interface from domain
    ) : BaseViewModel<ListState, ListAction, ListSideEffect>() { ... }
+   ```
+
+4. **Data** depends on Domain (and Core) for repository interfaces:
+   ```kotlin
+   // shared/feature/items/data — implements repository interface from core
+   internal class ApiItemRepository(
+       private val httpClient: HttpClient,
+   ) : ItemRepository { ... }
    ```
 
 5. **Koin** wires it all together at runtime:
@@ -405,7 +404,7 @@ graph TB
    }
    ```
 
-6. **Gradle plugins** enforce these boundaries at compile time — `ui` cannot import `data`, `domain` cannot import `data`, `core` cannot import Koin or Ktor.
+6. **Gradle plugins** enforce these boundaries at compile time — `ui` cannot import `data`, `data` cannot import `ui`, `core` cannot import Koin or Ktor.
 
 ---
 
