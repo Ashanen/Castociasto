@@ -19,6 +19,7 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 - [Dependency Injection](#dependency-injection)
 - [Build Convention Plugins](#build-convention-plugins)
 - [Testing Strategy](#testing-strategy)
+- [Getting Started](#getting-started)
 - [Tech Stack](#tech-stack)
 
 ---
@@ -826,13 +827,8 @@ listPage.waitForItemsToLoad()
 
 #### Running E2E tests
 
-Prerequisites:
-```bash
-npm install -g appium
-appium driver install uiautomator2
-```
+See [Getting Started](#getting-started) for full environment setup. Quick run:
 
-Run:
 ```bash
 # Terminal 1: start Appium server
 appium
@@ -840,6 +836,78 @@ appium
 # Terminal 2: run tests (emulator must be connected)
 ./gradlew :e2e:test
 ```
+
+If Appium server is not running, E2E tests are skipped automatically (not failed).
+
+---
+
+## Getting Started
+
+### 1. Install JDK 17+
+
+```bash
+brew install openjdk@17
+sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
+```
+
+Add to `~/.zshrc`:
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+```
+
+### 2. Android SDK tools
+
+Android Studio bundles the SDK, but CLI tools need to be in your PATH. Add to `~/.zshrc`:
+
+```bash
+export ANDROID_HOME=$HOME/Library/Android/sdk
+export PATH="$PATH:$ANDROID_HOME/platform-tools"
+export PATH="$PATH:$ANDROID_HOME/emulator"
+```
+
+Apply changes:
+```bash
+source ~/.zshrc
+```
+
+Verify:
+```bash
+java -version    # should show 17+
+adb devices      # should list connected devices/emulators
+```
+
+### 3. Build and run unit tests
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+### 4. E2E tests (Appium)
+
+#### One-time setup
+
+```bash
+npm install -g appium
+appium driver install uiautomator2
+```
+
+#### Run E2E tests
+
+1. Start an Android emulator (Android Studio -> Device Manager)
+2. Build the debug APK:
+   ```bash
+   ./gradlew :androidApp:assembleDebug
+   ```
+3. Start Appium server in a separate terminal:
+   ```bash
+   appium
+   ```
+4. Run the tests:
+   ```bash
+   ./gradlew :e2e:test
+   ```
+
+Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests.
 
 ---
 
