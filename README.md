@@ -23,7 +23,7 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 
 ```mermaid
 graph TB
-    subgraph Platform["Platform Layer"]
+    subgraph Platform["Platform Layer - Native UI"]
         Android[Android App - Jetpack Compose]
         iOS[iOS App - SwiftUI]
     end
@@ -31,33 +31,45 @@ graph TB
     subgraph Shared["Shared KMP Modules"]
         App[shared:app - DI aggregation + iOS export]
 
-        subgraph Features["Feature Modules"]
-            UI[UI - ViewModels + MVI Contracts]
-            Domain[Domain - Use Case Implementations]
-            Data[Data - Repository Implementations]
+        subgraph Feature1["feature:items"]
+            IU[ui] --> IDom[domain] --> IData[data]
         end
 
-        subgraph Core["Core API Modules"]
-            CoreAPI[Interfaces + Models only]
+        subgraph Feature2["feature:categories"]
+            CU[ui] --> CDom[domain] --> CData[data]
+        end
+
+        subgraph Feature3["feature:favorites"]
+            FU[ui] --> FDom[domain] --> FData[data]
+        end
+
+        subgraph Core["Core - Domain Contracts"]
+            CoreItems[core:items]
+            CoreCat[core:categories]
+            CoreFav[core:favorites]
         end
 
         Infra[Infrastructure - Networking]
-        Foundation[Foundation - BaseViewModel, Exceptions, Extensions]
+        Foundation[Foundation - BaseViewModel, Exceptions]
     end
 
     Android --> App
     iOS --> App
-    App --> UI
-    App --> Domain
-    App --> Data
-    App --> Infra
-    UI --> CoreAPI
-    UI --> Foundation
-    Domain --> CoreAPI
-    Domain --> Foundation
-    Data --> CoreAPI
-    Data --> Infra
-    CoreAPI --> Foundation
+
+    IU --> CoreItems
+    IDom --> CoreItems
+    IData --> CoreItems
+    IData --> Infra
+
+    CU --> CoreCat
+    CDom --> CoreCat
+
+    FU --> CoreFav
+    FDom --> CoreFav
+
+    CoreItems --> Foundation
+    CoreCat --> Foundation
+    CoreFav --> Foundation
     Infra --> Foundation
 ```
 
@@ -99,80 +111,96 @@ Castociasto/
 
 ## Dependency Flow
 
-The dependency graph strictly enforces that **inner layers never depend on outer layers**.
+The dependency graph strictly enforces that **inner layers never depend on outer layers** and **feature modules are fully isolated from each other**.
 
 ```mermaid
-graph LR
-    subgraph "Dependency Direction →"
-        UI["feature:ui"]
-        Domain["feature:domain"]
-        Data["feature:data"]
-        Core["core:*"]
-        Infra["infrastructure:networking"]
-        Found["foundation"]
+graph TB
+    subgraph Items["feature:items"]
+        IU[items:ui]
+        ID[items:domain]
+        IData[items:data]
     end
 
-    UI -->|"depends on"| Core
-    UI -->|"depends on"| Found
-    Domain -->|"depends on"| Core
-    Domain -->|"depends on"| Found
-    Data -->|"depends on"| Core
-    Data -->|"depends on"| Infra
-    Core -->|"depends on"| Found
-    Infra -->|"depends on"| Found
+    subgraph Categories["feature:categories"]
+        CU[categories:ui]
+        CD[categories:domain]
+        CData[categories:data]
+    end
 
-    style UI fill:#E8D5F5
-    style Domain fill:#D5E8F5
-    style Data fill:#D5F5E8
-    style Core fill:#F5E8D5
-    style Infra fill:#F5F5D5
-    style Found fill:#F5D5D5
+    subgraph Favorites["feature:favorites"]
+        FU[favorites:ui]
+        FD[favorites:domain]
+        FData[favorites:data]
+    end
+
+    CoreItems[core:items]
+    CoreCat[core:categories]
+    CoreFav[core:favorites]
+    Infra[infrastructure:networking]
+    Found[foundation]
+
+    IU --> CoreItems
+    ID --> CoreItems
+    ID --> CoreFav
+    IData --> CoreItems
+    IData --> Infra
+
+    CU --> CoreCat
+    CD --> CoreCat
+    CData --> CoreCat
+
+    FU --> CoreFav
+    FD --> CoreFav
+    FData --> CoreFav
+
+    CoreItems --> Found
+    CoreCat --> Found
+    CoreFav --> Found
+    Infra --> Found
 ```
 
 Key constraints:
-- **UI** never imports Domain or Data implementations
+- **Feature modules are isolated** — `feature:items` never depends on `feature:categories` or `feature:favorites`
+- **Core (Domain) is the center** — it defines contracts (interfaces), models, and use case signatures that UI and Data implement
+- **UI and Data point inward** — they depend on Core abstractions, never on each other
 - **Domain** never imports Data or Infrastructure
-- **Data** never imports Domain
-- **Core** never imports Koin, Ktor, or any implementation detail
-- All cross-layer communication happens through **interfaces defined in Core**
+- **Data** never imports Domain or UI
+- **UI** never imports Data
+- **Core** never imports Koin, Ktor, or any implementation detail — enforced by Gradle plugins
+- Cross-feature communication (e.g., items needing favorites) happens through **Core interfaces**, not feature implementations
 
 ---
 
 ## Clean Architecture Layers
 
+The **Core (Domain)** layer is the independent center of the architecture. It owns all contracts, models, and use case signatures. The outer layers (UI and Data) depend on it — never the reverse.
+
 ```mermaid
 graph TB
-    subgraph "Clean Architecture Layers (outer → inner)"
-        direction TB
+    UI[UI Layer - ViewModels, MVI Contracts] -->|depends on| Core
+    Data[Data Layer - Repositories, DTOs, API] -->|implements| Core
+    Domain[Domain Layer - Use Case Implementations] -->|implements| Core
 
-        L1[PRESENTATION - UI]
-        L2[DATA]
-        L3[DOMAIN]
-        L4[CORE - API CONTRACTS]
-        L5[FOUNDATION]
-    end
-
-    L1 -->|"calls"| L4
-    L2 -->|"implements"| L4
-    L3 -->|"implements"| L4
-    L3 -->|"depends on"| L4
-    L4 -->|"uses"| L5
-
-    style L1 fill:#E8D5F5
-    style L2 fill:#D5F5E8
-    style L3 fill:#D5E8F5
-    style L4 fill:#F5E8D5
-    style L5 fill:#F5D5D5
+    Core[Core - Interfaces, Models, Use Case Signatures]
+    Core -->|uses| Foundation[Foundation - BaseViewModel, Exceptions]
+    Data -->|uses| Infra[Infrastructure - Networking]
+    Infra -->|uses| Foundation
 ```
 
-| Layer | Module | Responsibility | Allowed Dependencies |
-|-------|--------|---------------|---------------------|
-| **Foundation** | `shared/foundation` | Base types, exceptions, flow extensions | Coroutines, Lifecycle |
+The **Domain layer** (`core/*`) is completely independent:
+- It defines **what** the app does (interfaces, models, use case contracts)
+- It has **zero knowledge** of how data is fetched or how UI is rendered
+- It depends only on Foundation (base types) and Kotlin Coroutines
+- UI and Data layers implement its contracts and point inward toward it
+
+| Layer | Module | Responsibility | Depends On |
+|-------|--------|---------------|------------|
+| **Core (Domain)** | `shared/core/*` | Interfaces, models, use case signatures | Foundation, Coroutines |
+| **Domain Impl** | `shared/feature/*/domain` | Use case implementations, business rules | Core, Foundation |
+| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Core, Infrastructure |
+| **UI** | `shared/feature/*/ui` | ViewModels, MVI state machines | Core, Foundation |
 | **Infrastructure** | `shared/infrastructure/networking` | HTTP client, error mapping, serialization | Foundation, Ktor |
-| **Core** | `shared/core/*` | Interfaces and models only | Foundation, Coroutines |
-| **Domain** | `shared/feature/*/domain` | Use case implementations, business rules | Core, Foundation, Koin |
-| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Core, Infrastructure, Koin |
-| **UI** | `shared/feature/*/ui` | ViewModels, MVI state machines | Core, Foundation, Koin, Lifecycle |
+| **Foundation** | `shared/foundation` | Base types, exceptions, flow extensions | Coroutines, Lifecycle |
 
 ---
 
@@ -292,39 +320,32 @@ See the [Dependency Inversion](#dependency-inversion) section below for details.
 
 ## Dependency Inversion
 
-Dependency Inversion is the architectural backbone of this project. The `core` modules define contracts; `domain` and `data` modules provide implementations.
+Dependency Inversion is the architectural backbone of this project. The **Core (Domain) layer** is fully independent — it defines all contracts, models, and use case signatures. The outer layers (UI, Data, Domain Impl) all point inward toward Core and implement its abstractions.
 
 ```mermaid
 graph TB
-    subgraph "core:items (Abstractions)"
-        IR["interface ItemRepository"]
-        GIU["fun interface GetItemsUseCase"]
-        IM["data class Item"]
+    subgraph "feature:items:ui"
+        LVM[ListViewModel]
     end
 
-    subgraph "feature:items:domain (High-level)"
-        GIUI["GetItemsUseCaseImpl"]
+    subgraph "feature:items:domain"
+        GIUI[GetItemsUseCaseImpl]
     end
 
-    subgraph "feature:items:data (Low-level)"
-        AIR["ApiItemRepository"]
+    subgraph "feature:items:data"
+        AIR[ApiItemRepository]
     end
 
-    subgraph "feature:items:ui (Consumer)"
-        LVM["ListViewModel"]
+    subgraph "core:items - Independent, owns all contracts"
+        GIU[fun interface GetItemsUseCase]
+        IR[interface ItemRepository]
+        IM[data class Item]
     end
 
-    GIUI -.->|"implements"| GIU
-    AIR -.->|"implements"| IR
-    GIUI -->|"depends on"| IR
-    LVM -->|"depends on"| GIU
-
-    style IR fill:#F5E8D5
-    style GIU fill:#F5E8D5
-    style IM fill:#F5E8D5
-    style GIUI fill:#D5E8F5
-    style AIR fill:#D5F5E8
-    style LVM fill:#E8D5F5
+    LVM -->|depends on| GIU
+    GIUI -.->|implements| GIU
+    GIUI -->|depends on| IR
+    AIR -.->|implements| IR
 ```
 
 ### How it works in practice
@@ -401,10 +422,6 @@ graph TB
     NE --> NC
     NE --> UNK
     DE --> DNF
-
-    style CE fill:#F5D5D5
-    style NE fill:#F5E8D5
-    style DE fill:#F5E8D5
 ```
 
 ### Error Flow Through Layers
@@ -515,17 +532,6 @@ graph LR
     IDO --> IU
     CDO --> CU
     FDO --> FU
-
-    style NET fill:#F5F5D5
-    style ID fill:#D5F5E8
-    style CD fill:#D5F5E8
-    style FD fill:#D5F5E8
-    style IDO fill:#D5E8F5
-    style CDO fill:#D5E8F5
-    style FDO fill:#D5E8F5
-    style IU fill:#E8D5F5
-    style CU fill:#E8D5F5
-    style FU fill:#E8D5F5
 ```
 
 All modules are aggregated in `shared/app`:
@@ -569,10 +575,6 @@ graph TB
 
     E2E ~~~ INT
     INT ~~~ UNIT
-
-    style E2E fill:#F5D5D5
-    style INT fill:#F5E8D5
-    style UNIT fill:#D5F5E8
 ```
 
 | Layer | Test Type | Approach |
