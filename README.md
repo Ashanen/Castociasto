@@ -850,31 +850,32 @@ brew install openjdk@17
 sudo ln -sfn /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-17.jdk
 ```
 
-Add to `~/.zshrc`:
+### 2. Environment variables
+
+Add **all** of the following to `~/.zshrc` (copy-paste the entire block):
+
 ```bash
+cat >> ~/.zshrc << 'EOF'
+
+# Java
 export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
-```
 
-### 2. Android SDK tools
-
-Android Studio bundles the SDK, but CLI tools need to be in your PATH. Add to `~/.zshrc`:
-
-```bash
+# Android SDK (required by Appium and adb)
 export ANDROID_HOME=$HOME/Library/Android/sdk
 export PATH="$PATH:$ANDROID_HOME/platform-tools"
 export PATH="$PATH:$ANDROID_HOME/emulator"
+EOF
 ```
 
-Apply changes:
+Then apply and verify:
 ```bash
 source ~/.zshrc
-```
-
-Verify:
-```bash
 java -version    # should show 17+
+echo $ANDROID_HOME  # should show /Users/<you>/Library/Android/sdk
 adb devices      # should list connected devices/emulators
 ```
+
+> **Important:** After editing `~/.zshrc`, close and reopen **all** terminal tabs — or run `source ~/.zshrc` in each open tab. Appium must be started in a terminal that has `ANDROID_HOME` set.
 
 ### 3. Build and run unit tests
 
