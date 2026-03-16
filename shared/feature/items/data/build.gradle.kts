@@ -3,10 +3,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
-android {
-    namespace = "pl.rockit.castociasto.feature.items.data"
-}
-
 kotlin {
     sourceSets {
         commonMain.dependencies {

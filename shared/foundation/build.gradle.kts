@@ -2,10 +2,6 @@ plugins {
     id("castociasto.kmp.library")
 }
 
-android {
-    namespace = "pl.rockit.castociasto.foundation"
-}
-
 kotlin {
     sourceSets {
         commonMain.dependencies {

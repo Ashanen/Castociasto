@@ -2,10 +2,6 @@ plugins {
     id("castociasto.kmp.ui")
 }
 
-android {
-    namespace = "pl.rockit.castociasto.feature.items.ui"
-}
-
 kotlin {
     sourceSets {
         commonMain.dependencies {
