@@ -21,14 +21,18 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     Text(item.title)
                         .font(.title)
+                        .accessibilityIdentifier("detail_title")
                     Text(item.subtitle)
                         .font(.body)
+                        .accessibilityIdentifier("detail_subtitle")
                     Spacer()
                 }
                 .padding()
             }
         }
+        .accessibilityIdentifier("detail_screen")
         .navigationTitle(state.item?.title ?? "")
+        .navigationBarBackButtonDisplayMode(.minimal)
         .task {
             viewModel.onAction(action: DetailActionLoadItem(id: itemId))
             for await newState in viewModel.uiState {

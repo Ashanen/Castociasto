@@ -1,33 +1,32 @@
 package pl.rockit.castociasto.e2e.page
 
-import io.appium.java_client.AppiumBy
-import io.appium.java_client.android.AndroidDriver
-import org.openqa.selenium.By
+import io.appium.java_client.AppiumDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 import org.openqa.selenium.support.ui.WebDriverWait
 import pl.rockit.castociasto.e2e.config.AppiumConfig
+import pl.rockit.castociasto.e2e.config.PlatformLocators
 import java.time.Duration
 
 /**
  * Page Object for the List screen.
- * All locators use Compose testTag (mapped to resource-id).
+ * Uses PlatformLocators for cross-platform element lookup.
  */
-class ListPage(private val driver: AndroidDriver) {
+class ListPage(private val driver: AppiumDriver) {
 
     private val wait = WebDriverWait(driver, Duration.ofSeconds(AppiumConfig.EXPLICIT_WAIT))
 
-    private val anyItem = AppiumBy.androidUIAutomator(
-        "new UiSelector().resourceIdMatches(\"item_.*\")"
-    )
+    private val anyItem get() = PlatformLocators.byIdPattern("item_.*")
 
     fun waitForItemsToLoad(): ListPage {
-        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("items_list")))
+        wait.until(ExpectedConditions.presenceOfElementLocated(PlatformLocators.byId("items_list")))
         wait.until(ExpectedConditions.presenceOfElementLocated(anyItem))
         return this
     }
 
     fun getTitle(): String {
-        return wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_title")))!!.text
+        return wait.until(
+            ExpectedConditions.presenceOfElementLocated(PlatformLocators.byId("list_title"))
+        )!!.text
     }
 
     fun getVisibleItemCount(): Int {
@@ -44,31 +43,35 @@ class ListPage(private val driver: AndroidDriver) {
 
     fun isDisplayed(): Boolean {
         return try {
-            driver.findElement(By.id("list_screen")).isDisplayed
+            driver.findElement(PlatformLocators.byId("list_screen")).isDisplayed
         } catch (_: Exception) {
             false
         }
     }
 
     fun waitForError(): ListPage {
-        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_error")))
+        wait.until(ExpectedConditions.presenceOfElementLocated(PlatformLocators.byId("list_error")))
         return this
     }
 
     fun isErrorDisplayed(): Boolean {
         return try {
-            driver.findElement(By.id("list_error")).isDisplayed
+            driver.findElement(PlatformLocators.byId("list_error")).isDisplayed
         } catch (_: Exception) {
             false
         }
     }
 
     fun getErrorMessage(): String {
-        return wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_error_message")))!!.text
+        return wait.until(
+            ExpectedConditions.presenceOfElementLocated(PlatformLocators.byId("list_error_message"))
+        )!!.text
     }
 
     fun tapRetry(): ListPage {
-        wait.until(ExpectedConditions.elementToBeClickable(By.id("list_retry_button"))).click()
+        wait.until(
+            ExpectedConditions.elementToBeClickable(PlatformLocators.byId("list_retry_button"))
+        ).click()
         return this
     }
 }

@@ -15,6 +15,18 @@ struct ItemListView: View {
         Group {
             if state.isLoading {
                 ProgressView()
+                    .accessibilityIdentifier("list_loading")
+            } else if let error = state.error {
+                VStack(spacing: 12) {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .accessibilityIdentifier("list_error_message")
+                    Button("Retry") {
+                        viewModel.onAction(action: ListActionRefresh())
+                    }
+                    .accessibilityIdentifier("list_retry_button")
+                }
+                .accessibilityIdentifier("list_error")
             } else {
                 List(state.items, id: \.id) { item in
                     Button {
@@ -28,10 +40,19 @@ struct ItemListView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+                    .accessibilityIdentifier("item_\(item.id)")
                 }
+                .accessibilityIdentifier("items_list")
             }
         }
-        .navigationTitle("Castociasto")
+        .accessibilityIdentifier("list_screen")
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Castociasto")
+                    .font(.headline)
+                    .accessibilityIdentifier("list_title")
+            }
+        }
         .navigationDestination(item: $selectedItemId) { itemId in
             ItemDetailView(itemId: itemId)
         }

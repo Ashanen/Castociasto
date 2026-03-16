@@ -889,10 +889,11 @@ adb devices      # should list connected devices/emulators
 
 ```bash
 npm install -g appium
-appium driver install uiautomator2
+appium driver install uiautomator2   # Android
+appium driver install xcuitest       # iOS
 ```
 
-#### Run E2E tests
+#### Run E2E tests (Android)
 
 1. Start an Android emulator (Android Studio -> Device Manager)
 2. Build the debug APK:
@@ -907,6 +908,27 @@ appium driver install uiautomator2
    ```bash
    ./gradlew :e2e:test
    ```
+
+#### Run E2E tests (iOS)
+
+1. Boot an iOS simulator:
+   ```bash
+   xcrun simctl boot "iPhone 16"
+   open -a Simulator
+   ```
+2. Build the iOS app:
+   ```bash
+   xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug build
+   ```
+3. Start Appium server in a separate terminal:
+   ```bash
+   appium
+   ```
+4. Run the tests:
+   ```bash
+   PLATFORM=ios ./gradlew :e2e:test
+   ```
+   Optional overrides: `IOS_DEVICE_NAME`, `IOS_PLATFORM_VERSION`, `APP_PATH`.
 
 Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests.
 

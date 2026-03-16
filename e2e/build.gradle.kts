@@ -18,3 +18,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.testJunit)
 }
+
+tasks.test {
+    systemProperty("platform", System.getProperty("platform") ?: "android")
+}
