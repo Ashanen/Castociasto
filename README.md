@@ -9,6 +9,9 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 - [Dependency Flow](#dependency-flow)
 - [Feature Isolation](#feature-isolation)
 - [Clean Architecture Layers](#clean-architecture-layers)
+- [Event Bus](#event-bus)
+- [Database + API Sync](#database--api-sync)
+- [Observable vs One-Shot Use Cases](#observable-vs-one-shot-use-cases)
 - [MVI Pattern](#mvi-pattern)
 - [SOLID Principles](#solid-principles)
 - [Dependency Inversion](#dependency-inversion)
@@ -54,9 +57,14 @@ graph TB
             CoreItems[core:items]
             CoreCat[core:categories]
             CoreFav[core:favorites]
+            CoreEvents[core:events]
         end
 
-        Infra[infrastructure:networking]
+        subgraph Infrastructure
+            Infra[infrastructure:networking]
+            DB[infrastructure:database]
+        end
+
         Found[foundation]
     end
 
@@ -64,7 +72,10 @@ graph TB
     iOS --> App
 
     IU --> IDom
+    IU --> CoreEvents
     IData --> IDom
+    IData --> DB
+    IData --> CoreEvents
     IDom --> CoreItems
     IDom --> CoreFav
     IData --> Infra
@@ -75,6 +86,7 @@ graph TB
 
     FU --> FDom
     FData --> FDom
+    FData --> CoreEvents
     FDom --> CoreItems
     FDom --> CoreFav
 
@@ -99,15 +111,17 @@ Castociasto/
     ├── app/                             # DI aggregation + iOS framework export
     ├── foundation/                      # Base types: BaseViewModel, exceptions, extensions
     ├── infrastructure/
-    │   └── networking/                  # Ktor HTTP client, safeApiCall, JSON config
-    ├── core/                            # Shared models + cross-feature repository interfaces
+    │   ├── networking/                  # Ktor HTTP client, safeApiCall, JSON config
+    │   └── database/                   # Room database, DAOs, entities
+    ├── core/                            # Shared models + cross-feature contracts
     │   ├── items/                       # Item model, ItemRepository interface
     │   ├── categories/                  # Category model, CategoryRepository interface
-    │   └── favorites/                   # FavoriteRepository interface (depends on core:items)
+    │   ├── favorites/                   # FavoriteRepository interface (depends on core:items)
+    │   └── events/                     # AppEvent, AppEventBus (cross-feature communication)
     └── feature/                         # Features (domain/data/ui per feature, fully isolated)
         ├── items/
-        │   ├── domain/                  # GetItemsUseCase, GetItemUseCase + implementations
-        │   ├── data/                    # ApiItemRepository (Ktor HTTP)
+        │   ├── domain/                  # GetItems, ObserveItems, RefreshItems use cases
+        │   ├── data/                    # OfflineFirstItemRepository (Room + Ktor)
         │   └── ui/                      # ListViewModel, DetailViewModel, MVI contracts
         ├── categories/
         │   ├── domain/                  # GetCategoriesUseCase + implementation
@@ -115,7 +129,7 @@ Castociasto/
         │   └── ui/                      # CategoriesViewModel
         └── favorites/
             ├── domain/                  # GetFavoritesUseCase, ToggleFavoriteUseCase + implementations
-            ├── data/                    # FakeFavoriteRepository (in-memory)
+            ├── data/                    # FakeFavoriteRepository (in-memory, emits events)
             └── ui/                      # FavoritesViewModel
 ```
 
@@ -123,7 +137,7 @@ Castociasto/
 
 ## Dependency Flow
 
-Within each feature, **UI and Data both depend on Domain**. Domain is the center — it owns use case interfaces and contracts. Core provides shared models and cross-feature repository interfaces that Domain depends on.
+Within each feature, **UI and Data both depend on Domain**. Domain is the center — it owns use case interfaces and contracts. Core provides shared models and cross-feature repository interfaces.
 
 ```mermaid
 graph TB
@@ -134,7 +148,7 @@ graph TB
     end
 ```
 
-This is the key architectural rule — **UI → Domain ← Data**:
+This is the key architectural rule — **UI -> Domain <- Data**:
 
 - `ui` depends on Domain for use case interfaces (and Core for shared models)
 - `data` depends on Domain for repository contracts (and Core for shared models)
@@ -159,7 +173,7 @@ graph TB
     end
 ```
 
-**Cross-feature communication** — features never depend on each other directly. When `favorites` needs the `Item` model or `ItemRepository` from items, it goes through Core:
+**Cross-feature communication** — features never depend on each other directly. When `favorites` needs the `Item` model or `ItemRepository` from items, it goes through Core. For runtime events, features communicate through the **Event Bus** (`core:events`):
 
 ```mermaid
 graph TB
@@ -172,6 +186,9 @@ graph TB
         IU[items:ui] --> IDom[items:domain]
         IData[items:data] --> IDom
     end
+
+    FData -->|emits FavoriteToggled| EB[core:events]
+    IData -->|emits ItemsUpdated| EB
 
     FDom --> CoreFav[core:favorites]
     FDom --> CoreItems[core:items]
@@ -186,7 +203,7 @@ Features share concepts through **Core modules** — never through each other's 
 
 ## Clean Architecture Layers
 
-**Domain** is the center of each feature. It owns use case interfaces and implementations. UI and Data both depend on Domain. Core provides shared models and cross-feature repository interfaces.
+**Domain** is the center of each feature. It owns use case interfaces and implementations. UI and Data both depend on Domain. Core provides shared models and repository interfaces.
 
 ```mermaid
 graph TB
@@ -195,17 +212,149 @@ graph TB
     Domain[Domain - Use Case Interfaces + Impls] -->|depends on| Core[Core - Shared Models + Repo Interfaces]
     Core --> Found[Foundation]
     Data -->|uses| Infra[Infrastructure]
+    Data -->|uses| DB[Database]
     Infra --> Found
 ```
 
 | Layer | Module | Role | Depends On |
 |-------|--------|------|------------|
 | **Domain** | `shared/feature/*/domain` | Use case interfaces, use case implementations, business rules | Core, Foundation |
-| **Core** | `shared/core/*` | Shared models and cross-feature repository interfaces | Foundation |
+| **Core** | `shared/core/*` | Shared models, repository interfaces, event bus | Foundation |
 | **UI** | `shared/feature/*/ui` | ViewModels, MVI state machines | Domain, Core, Foundation |
-| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Domain, Core, Infrastructure |
+| **Data** | `shared/feature/*/data` | Repository implementations, DTO mapping | Domain, Core, Infrastructure, Database |
 | **Infrastructure** | `shared/infrastructure/networking` | HTTP client, error mapping, serialization | Foundation |
+| **Infrastructure** | `shared/infrastructure/database` | Room database, DAOs, entities | — |
 | **Foundation** | `shared/foundation` | BaseViewModel, exception hierarchy, flow extensions | — |
+
+---
+
+## Event Bus
+
+The **Event Bus** (`core:events`) enables cross-module communication without tight coupling. It's a shared contract module — features emit and observe events without knowing about each other.
+
+```mermaid
+sequenceDiagram
+    participant Fav as FakeFavoriteRepository
+    participant EB as AppEventBus
+    participant Items as OfflineFirstItemRepository
+
+    Fav->>EB: emit(FavoriteToggled("42"))
+    EB-->>Items: FavoriteToggled("42")
+    Note over Items: Can react to favorites changing
+```
+
+### Events
+
+```kotlin
+sealed interface AppEvent {
+    data class FavoriteToggled(val itemId: String) : AppEvent
+    data object ItemsUpdated : AppEvent
+}
+```
+
+### AppEventBus
+
+```kotlin
+interface AppEventBus {
+    val events: SharedFlow<AppEvent>
+    suspend fun emit(event: AppEvent)
+}
+```
+
+The implementation uses a `MutableSharedFlow` with extra buffer capacity for fire-and-forget semantics. It's registered as a singleton in Koin and injected into any module that needs cross-feature communication.
+
+---
+
+## Database + API Sync
+
+The **offline-first** pattern uses Room as a local cache with API as the source of truth. The database module (`infrastructure:database`) provides DAOs and entities, while feature data modules implement the sync strategy.
+
+```mermaid
+sequenceDiagram
+    participant VM as ListViewModel
+    participant UC as ObserveItemsUseCase
+    participant Repo as OfflineFirstItemRepository
+    participant DAO as ItemDao (Room)
+    participant API as Ktor HTTP
+
+    VM->>UC: observeItems()
+    UC->>Repo: observeItems()
+    Repo->>DAO: observeAll()
+    DAO-->>VM: Flow<List<Item>> (continuous)
+
+    VM->>Repo: refresh()
+    Repo->>API: GET /posts
+    API-->>Repo: List<PostDto>
+    Repo->>DAO: upsertAll(entities)
+    Note over DAO,VM: Room Flow automatically re-emits updated data
+```
+
+### Key patterns
+
+- **`observeItems()`** returns a `Flow` from Room that never completes — UI receives updates automatically when the database changes
+- **`refresh()`** fetches from the API and upserts into Room — the observable Flow handles propagation
+- **`getItems()` / `getItem()`** are one-shot suspend functions that read from the DAO directly
+
+---
+
+## Observable vs One-Shot Use Cases
+
+The project uses two patterns for use cases, each as a `fun interface`:
+
+### One-shot use cases (fetch once)
+
+```kotlin
+fun interface GetItemsUseCase {
+    operator fun invoke(): Flow<List<Item>>  // completes after single emission
+}
+
+// Implementation uses flowSingle { } — emits once and completes
+internal class GetItemsUseCaseImpl(
+    private val repository: ItemRepository,
+) : GetItemsUseCase {
+    override fun invoke() = flowSingle {
+        repository.getItems().sortedBy { it.title }
+    }
+}
+```
+
+### Observable use cases (continuous stream)
+
+```kotlin
+fun interface ObserveItemsUseCase {
+    operator fun invoke(): Flow<List<Item>>  // never completes — emits on every change
+}
+
+// Implementation delegates to repository's Flow (backed by Room)
+internal class ObserveItemsUseCaseImpl(
+    private val repository: ItemRepository,
+) : ObserveItemsUseCase {
+    override fun invoke() = repository.observeItems()
+}
+```
+
+### Refresh use case (trigger sync)
+
+```kotlin
+fun interface RefreshItemsUseCase {
+    operator fun invoke(): Flow<Unit>  // one-shot: triggers API fetch + DB upsert
+}
+```
+
+### ViewModel usage
+
+```kotlin
+// Observe continuously — never completes, UI always up to date
+observeItems()
+    .onEach { items -> _uiState.update { it.copy(items = items) } }
+    .launchWith(viewModelScope) { ... }
+
+// Trigger refresh — one-shot, manages loading state
+refreshItems()
+    .onStart { _uiState.update { it.copy(isLoading = true) } }
+    .onEach { _uiState.update { it.copy(isLoading = false) } }
+    .launchWith(viewModelScope) { ... }
+```
 
 ---
 
@@ -220,12 +369,13 @@ sequenceDiagram
     participant UC as UseCase
     participant Repo as Repository
 
-    View->>VM: onAction(ListAction.LoadItems)
+    View->>VM: onAction(ListAction.Refresh)
     VM->>VM: _uiState.update { copy(isLoading = true) }
-    VM->>UC: getItems()
-    UC->>Repo: repository.getItems()
-    Repo-->>UC: List of Items
-    UC-->>VM: Flow of Items
+    VM->>UC: refreshItems()
+    UC->>Repo: repository.refresh()
+    Repo-->>UC: Unit
+    UC-->>VM: Flow completes
+    Note over VM: observeItems() Flow re-emits from Room
     VM->>VM: _uiState.update { copy(items, isLoading = false) }
     VM-->>View: uiState (StateFlow)
 
@@ -248,7 +398,7 @@ data class ListState(
 
 // Action — user intents (sealed interface)
 sealed interface ListAction {
-    data object LoadItems : ListAction
+    data object Refresh : ListAction
     data class ItemClicked(val itemId: String) : ListAction
 }
 
@@ -284,9 +434,10 @@ Each module and class has exactly one reason to change:
 
 | Class | Single Responsibility |
 |-------|----------------------|
-| `GetItemsUseCaseImpl` | Fetches and sorts items |
+| `ObserveItemsUseCaseImpl` | Continuous item observation from database |
+| `RefreshItemsUseCaseImpl` | Triggers API fetch and database sync |
 | `GetItemUseCaseImpl` | Combines item data with favorite status |
-| `ApiItemRepository` | HTTP communication for items |
+| `OfflineFirstItemRepository` | Coordinates API, database, and events for items |
 | `ListViewModel` | Manages list screen MVI state machine |
 | `safeApiCall` | Maps HTTP exceptions to domain exceptions |
 
@@ -295,6 +446,7 @@ Each module and class has exactly one reason to change:
 - New features are added by creating new modules — no existing code is modified
 - The `CastociastoException` sealed hierarchy is extensible with new exception categories
 - New use cases implement existing `fun interface` contracts without changing consumers
+- New `AppEvent` subtypes can be added to the sealed interface without modifying existing handlers
 
 ### Liskov Substitution (LSP)
 
@@ -306,7 +458,7 @@ Each module and class has exactly one reason to change:
 
 - Use cases are defined as **single-method functional interfaces** (`fun interface`):
   ```kotlin
-  fun interface GetItemsUseCase {
+  fun interface ObserveItemsUseCase {
       operator fun invoke(): Flow<List<Item>>
   }
   ```
@@ -330,12 +482,14 @@ graph TB
     end
 
     subgraph "feature:items:domain"
-        GIU[fun interface GetItemsUseCase]
-        GIUI[GetItemsUseCaseImpl]
+        OIU[fun interface ObserveItemsUseCase]
+        OIUI[ObserveItemsUseCaseImpl]
+        RIU[fun interface RefreshItemsUseCase]
+        RIUI[RefreshItemsUseCaseImpl]
     end
 
     subgraph "feature:items:data"
-        AIR[ApiItemRepository]
+        OFR[OfflineFirstItemRepository]
     end
 
     subgraph "core:items"
@@ -343,10 +497,13 @@ graph TB
         IM[data class Item]
     end
 
-    LVM -->|depends on| GIU
-    GIUI -.->|implements| GIU
-    GIUI -->|depends on| IR
-    AIR -.->|implements| IR
+    LVM -->|depends on| OIU
+    LVM -->|depends on| RIU
+    OIUI -.->|implements| OIU
+    RIUI -.->|implements| RIU
+    OIUI -->|depends on| IR
+    RIUI -->|depends on| IR
+    OFR -.->|implements| IR
 ```
 
 ### How it works in practice
@@ -359,45 +516,53 @@ graph TB
    interface ItemRepository {
        suspend fun getItems(): List<Item>
        suspend fun getItem(id: String): Item?
+       fun observeItems(): Flow<List<Item>>
+       fun observeItem(id: String): Flow<Item?>
+       suspend fun refresh()
    }
    ```
 
 2. **Domain** defines use case interfaces and provides implementations:
    ```kotlin
-   // shared/feature/items/domain — use case interface (public)
-   fun interface GetItemsUseCase {
+   // shared/feature/items/domain — use case interfaces (public)
+   fun interface ObserveItemsUseCase {
        operator fun invoke(): Flow<List<Item>>
    }
+   fun interface RefreshItemsUseCase {
+       operator fun invoke(): Flow<Unit>
+   }
 
-   // shared/feature/items/domain — implementation (internal)
-   internal class GetItemsUseCaseImpl(
-       private val repository: ItemRepository,  // interface from core
-   ) : GetItemsUseCase { ... }
+   // shared/feature/items/domain — implementations (internal)
+   internal class ObserveItemsUseCaseImpl(
+       private val repository: ItemRepository,
+   ) : ObserveItemsUseCase { ... }
    ```
 
 3. **UI** depends on Domain for use case interfaces:
    ```kotlin
-   // shared/feature/items/ui — depends on domain for GetItemsUseCase
    class ListViewModel(
-       private val getItems: GetItemsUseCase,  // interface from domain
+       private val observeItems: ObserveItemsUseCase,
+       private val refreshItems: RefreshItemsUseCase,
    ) : BaseViewModel<ListState, ListAction, ListSideEffect>() { ... }
    ```
 
 4. **Data** depends on Domain (and Core) for repository interfaces:
    ```kotlin
-   // shared/feature/items/data — implements repository interface from core
-   internal class ApiItemRepository(
+   internal class OfflineFirstItemRepository(
        private val httpClient: HttpClient,
+       private val itemDao: ItemDao,
+       private val eventBus: AppEventBus,
    ) : ItemRepository { ... }
    ```
 
 5. **Koin** wires it all together at runtime:
    ```kotlin
    val itemsDataModule = module {
-       single<ItemRepository> { ApiItemRepository(get()) }
+       single<ItemRepository> { OfflineFirstItemRepository(get(), get(), get()) }
    }
    val itemsDomainModule = module {
-       factory<GetItemsUseCase> { GetItemsUseCaseImpl(get()) }
+       factory<ObserveItemsUseCase> { ObserveItemsUseCaseImpl(get()) }
+       factory<RefreshItemsUseCase> { RefreshItemsUseCaseImpl(get()) }
    }
    val itemsUiModule = module {
        viewModelOf(::ListViewModel)
@@ -475,12 +640,12 @@ suspend fun <T> safeApiCall(block: suspend () -> T): T {
 }
 ```
 
-**2. Data** — Repositories call `safeApiCall()` and may handle specific exceptions:
+**2. Data** — Repositories call `safeApiCall()` and sync to the database:
 ```kotlin
-override suspend fun getItem(id: String): Item? = try {
-    safeApiCall { httpClient.get("posts/$id").body<PostDto>().toItem() }
-} catch (e: CastociastoException.NetworkException.NotFound) {
-    null  // 404 is expected — return null
+override suspend fun refresh() {
+    val posts = safeApiCall { httpClient.get("posts").body<List<PostDto>>() }
+    itemDao.upsertAll(posts.map { it.toEntity() })
+    eventBus.emit(AppEvent.ItemsUpdated)
 }
 ```
 
@@ -492,9 +657,9 @@ val item = itemRepository.getItem(id)
 
 **4. UI** — ViewModels catch errors via `launchWith()` extension and map to UI state:
 ```kotlin
-getItems()
+refreshItems()
     .onStart { _uiState.update { it.copy(isLoading = true) } }
-    .onEach { items -> _uiState.update { it.copy(items = items, isLoading = false) } }
+    .onEach { _uiState.update { it.copy(isLoading = false) } }
     .launchWith(viewModelScope) { error ->
         _uiState.update { it.copy(isLoading = false, error = error.message) }
     }
@@ -510,6 +675,8 @@ getItems()
 graph LR
     subgraph Infra
         NET[networkingModule]
+        DBM[databaseModule]
+        EVM[eventsModule]
     end
 
     subgraph Data
@@ -531,6 +698,9 @@ graph LR
     end
 
     NET --> ID
+    DBM --> ID
+    EVM --> ID
+    EVM --> FD
     ID --> IDO
     CD --> CDO
     FD --> FDO
@@ -542,7 +712,7 @@ graph LR
 All modules are aggregated in `shared/app`:
 ```kotlin
 val appModules = listOf(
-    networkingModule,
+    networkingModule, databaseModule, eventsModule,
     itemsDataModule, itemsDomainModule, itemsUiModule,
     categoriesDataModule, categoriesDomainModule, categoriesUiModule,
     favoritesDataModule, favoritesDomainModule, favoritesUiModule,
@@ -574,7 +744,7 @@ This means a `core` module **physically cannot** import Koin or Ktor — the dep
 graph TB
     subgraph "Testing Pyramid"
         E2E[E2E Tests - Appium]
-        INT[Integration Tests - Mock HTTP Engine]
+        INT[Integration Tests - Mock HTTP + Fake DAOs]
         UNIT[Unit Tests - Fakes + Turbine]
     end
 
@@ -584,10 +754,92 @@ graph TB
 
 | Layer | Test Type | Approach |
 |-------|-----------|----------|
+| **Core** | Unit tests | Event bus emission/subscription with Turbine |
 | **Domain** | Unit tests | Fake repositories, Turbine for Flow assertions |
-| **Data** | Integration tests | Ktor `MockEngine` for HTTP response simulation |
+| **Data** | Integration tests | Ktor `MockEngine` + Fake DAOs for offline-first testing |
 | **UI** | ViewModel tests | Fake use cases, MVI state/effect assertions |
-| **E2E** | End-to-end | Appium tests on real devices |
+| **E2E** | End-to-end | Appium + UiAutomator2 on emulators/devices |
+
+### E2E Testing with Appium
+
+End-to-end tests live in the `e2e/` module and use **Appium** with the **UiAutomator2** driver to automate the Android app on real emulators or devices.
+
+#### Compose + Appium: `testTag` as `resource-id`
+
+Jetpack Compose elements are invisible to UiAutomator by default. To make them discoverable:
+
+1. **Enable `testTagsAsResourceId`** once at the root composable (in `MainActivity`):
+   ```kotlin
+   Box(modifier = Modifier.semantics { testTagsAsResourceId = true }) {
+       CastociastoNavHost()
+   }
+   ```
+
+2. **Add `testTag` to composables** you want to locate in tests:
+   ```kotlin
+   Scaffold(modifier = Modifier.testTag("list_screen")) { ... }
+   LazyColumn(modifier = Modifier.testTag("items_list")) { ... }
+   Text("Castociasto", modifier = Modifier.semantics { testTag = "list_title" })
+   ```
+
+3. **Find elements in Appium** via `By.id("testTag")`:
+   ```kotlin
+   driver.findElement(By.id("list_screen"))     // resource-id = "list_screen"
+   driver.findElement(By.id("items_list"))       // resource-id = "items_list"
+   ```
+
+| Compose API | UiAutomator attribute | Appium locator |
+|---|---|---|
+| `Modifier.testTag("x")` | `resource-id = "x"` | `By.id("x")` |
+| `Icon(contentDescription = "Back")` | `content-desc = "Back"` | `AppiumBy.accessibilityId("Back")` |
+| `Text("visible text")` | `text = "visible text"` | `By.xpath("//..[@text='visible text']")` |
+
+#### Appium capabilities
+
+Two capabilities are critical for Compose:
+
+- **`disableIdLocatorAutocompletion = true`** — prevents Appium from prefixing `resource-id` with the package name (Compose `testTag` sets raw strings, not `package:id/tag`)
+- **`forceAppLaunch = true`** — restarts the app for each test so it always starts on the list screen
+
+#### Page Object pattern
+
+Tests use the **Page Object Model** — each screen has a page class that encapsulates locators and actions:
+
+```
+e2e/src/test/kotlin/.../e2e/
+├── base/BaseE2ETest.kt        # Driver setup, capabilities, teardown
+├── config/AppiumConfig.kt     # Server URL, timeouts, APK path
+├── page/
+│   ├── ListPage.kt            # waitForItemsToLoad(), tapFirstItem(), isDisplayed()
+│   └── DetailPage.kt          # waitForContent(), tapBack(), isDisplayed()
+└── test/ItemsFlowE2ETest.kt   # 5 user journey tests
+```
+
+Page methods return page objects for fluent chaining:
+```kotlin
+listPage.waitForItemsToLoad()
+    .tapFirstItem()           // returns DetailPage
+    .waitForContent()
+    .tapBack()                // returns ListPage
+    .waitForItemsToLoad()
+```
+
+#### Running E2E tests
+
+Prerequisites:
+```bash
+npm install -g appium
+appium driver install uiautomator2
+```
+
+Run:
+```bash
+# Terminal 1: start Appium server
+appium
+
+# Terminal 2: run tests (emulator must be connected)
+./gradlew :e2e:test
+```
 
 ---
 
@@ -600,6 +852,7 @@ graph TB
 | **iOS UI** | SwiftUI |
 | **Architecture** | Clean Architecture + MVI |
 | **Networking** | Ktor |
+| **Database** | Room (KMP) |
 | **Serialization** | kotlinx.serialization |
 | **DI** | Koin |
 | **Async** | Kotlin Coroutines + Flow |

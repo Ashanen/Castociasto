@@ -35,7 +35,11 @@ kotlin {
         commonMain.dependencies {
             api(projects.shared.foundation)
             api(projects.shared.infrastructure.networking)
+            api(projects.shared.infrastructure.database)
             api(libs.koin.core)
+
+            // Core
+            api(projects.shared.core.events)
 
             // Items
             api(projects.shared.core.items)

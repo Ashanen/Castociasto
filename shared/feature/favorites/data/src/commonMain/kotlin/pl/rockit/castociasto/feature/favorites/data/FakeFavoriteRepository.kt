@@ -1,8 +1,12 @@
 package pl.rockit.castociasto.feature.favorites.data
 
+import pl.rockit.castociasto.core.events.AppEvent
+import pl.rockit.castociasto.core.events.AppEventBus
 import pl.rockit.castociasto.core.favorites.repository.FavoriteRepository
 
-internal class FakeFavoriteRepository : FavoriteRepository {
+internal class FakeFavoriteRepository(
+    private val eventBus: AppEventBus,
+) : FavoriteRepository {
 
     private val favoriteIds = mutableSetOf("1", "3")
 
@@ -16,5 +20,6 @@ internal class FakeFavoriteRepository : FavoriteRepository {
         } else {
             favoriteIds.add(itemId)
         }
+        eventBus.emit(AppEvent.FavoriteToggled(itemId))
     }
 }

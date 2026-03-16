@@ -9,7 +9,7 @@ data class ListState(
 )
 
 sealed interface ListAction {
-    data object LoadItems : ListAction
+    data object Refresh : ListAction
     data class ItemClicked(val itemId: String) : ListAction
 }
 

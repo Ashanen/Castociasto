@@ -1,6 +1,8 @@
 package pl.rockit.castociasto.feature.favorites.domain
 
 import app.cash.turbine.test
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import pl.rockit.castociasto.core.favorites.repository.FavoriteRepository
 import pl.rockit.castociasto.core.items.model.Item
@@ -71,4 +73,7 @@ private class FakeItemRepository : ItemRepository {
 
     override suspend fun getItems(): List<Item> = itemById.values.toList()
     override suspend fun getItem(id: String): Item? = itemById[id]
+    override fun observeItems(): Flow<List<Item>> = emptyFlow()
+    override fun observeItem(id: String): Flow<Item?> = emptyFlow()
+    override suspend fun refresh() {}
 }

@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
@@ -50,6 +51,7 @@ fun DetailScreen(
     }
 
     Scaffold(
+        modifier = Modifier.testTag("detail_screen"),
         topBar = {
             TopAppBar(
                 title = { Text(state.item?.title ?: "") },
@@ -94,11 +96,15 @@ fun DetailScreen(
                             .padding(padding)
                             .padding(16.dp),
                     ) {
-                        Text(item.title, style = MaterialTheme.typography.headlineMedium)
+                        Text(
+                            item.title,
+                            style = MaterialTheme.typography.headlineMedium,
+                            modifier = Modifier.testTag("detail_title"),
+                        )
                         Text(
                             item.subtitle,
                             style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(top = 16.dp),
+                            modifier = Modifier.padding(top = 16.dp).testTag("detail_subtitle"),
                         )
                     }
                 }

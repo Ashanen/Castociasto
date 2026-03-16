@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import pl.rockit.castociasto.core.items.model.Item
-import pl.rockit.castociasto.core.items.usecase.GetItemUseCase
+import pl.rockit.castociasto.feature.items.domain.GetItemUseCase
 import pl.rockit.castociasto.feature.items.ui.DetailViewModel
 import pl.rockit.castociasto.foundation.extensions.flowSingle
 

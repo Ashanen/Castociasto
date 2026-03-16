@@ -1,5 +1,6 @@
 package pl.rockit.castociasto.e2e.page
 
+import io.appium.java_client.AppiumBy
 import io.appium.java_client.android.AndroidDriver
 import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.ExpectedConditions
@@ -9,63 +10,39 @@ import java.time.Duration
 
 /**
  * Page Object for the List screen.
- * Encapsulates all locators and interactions for the items list.
+ * All locators use Compose testTag (mapped to resource-id).
  */
 class ListPage(private val driver: AndroidDriver) {
 
     private val wait = WebDriverWait(driver, Duration.ofSeconds(AppiumConfig.EXPLICIT_WAIT))
 
+    private val anyItem = AppiumBy.androidUIAutomator(
+        "new UiSelector().resourceIdMatches(\"item_.*\")"
+    )
+
     fun waitForItemsToLoad(): ListPage {
-        wait.until(
-            ExpectedConditions.presenceOfElementLocated(By.xpath("//android.widget.TextView"))
-        )
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.id("items_list")))
+        wait.until(ExpectedConditions.presenceOfElementLocated(anyItem))
         return this
     }
 
     fun getTitle(): String {
-        val titleElement = wait.until(
-            ExpectedConditions.presenceOfElementLocated(
-                By.xpath("//android.widget.TextView[@text='Castociasto']")
-            )
-        )
-        return titleElement?.text ?: ""
-    }
-
-    fun getItemTitles(): List<String> {
-        val elements = driver.findElements(By.className("android.widget.TextView"))
-        // Filter out the app title and other non-item texts
-        return elements
-            .map { it.text }
-            .filter { it.isNotBlank() && it != "Castociasto" }
+        return wait.until(ExpectedConditions.presenceOfElementLocated(By.id("list_title")))!!.text
     }
 
     fun getVisibleItemCount(): Int {
-        return getItemTitles().size
-    }
-
-    fun tapItem(title: String): DetailPage {
-        val item = wait.until(
-            ExpectedConditions.elementToBeClickable(
-                By.xpath("//android.widget.TextView[@text='$title']")
-            )
-        )
-        item.click()
-        return DetailPage(driver)
+        return driver.findElements(anyItem).size
     }
 
     fun tapFirstItem(): DetailPage {
-        val items = driver.findElements(By.className("android.widget.TextView"))
-        val firstItem = items.firstOrNull { it.text.isNotBlank() && it.text != "Castociasto" }
-            ?: throw NoSuchElementException("No items found in list")
-        firstItem.click()
+        wait.until(ExpectedConditions.elementToBeClickable(anyItem)).click()
         return DetailPage(driver)
     }
 
     fun isDisplayed(): Boolean {
         return try {
-            driver.findElement(By.xpath("//android.widget.TextView[@text='Castociasto']"))
-                .isDisplayed
-        } catch (e: Exception) {
+            driver.findElement(By.id("list_screen")).isDisplayed
+        } catch (_: Exception) {
             false
         }
     }

@@ -1,7 +1,5 @@
 package pl.rockit.castociasto.e2e.test
 
-import org.junit.Assume
-import org.junit.Before
 import org.junit.Test
 import pl.rockit.castociasto.e2e.base.BaseE2ETest
 import pl.rockit.castociasto.e2e.page.ListPage
@@ -24,17 +22,7 @@ import kotlin.test.assertTrue
  */
 class ItemsFlowE2ETest : BaseE2ETest() {
 
-    private lateinit var listPage: ListPage
-
-    @Before
-    fun checkPreconditions() {
-        // Skip tests if Appium server is not available
-        try {
-            listPage = ListPage(driver)
-        } catch (e: Exception) {
-            Assume.assumeNoException("Appium server not available, skipping E2E tests", e)
-        }
-    }
+    private val listPage: ListPage get() = ListPage(driver)
 
     @Test
     fun appLaunchesAndShowsListScreen() {

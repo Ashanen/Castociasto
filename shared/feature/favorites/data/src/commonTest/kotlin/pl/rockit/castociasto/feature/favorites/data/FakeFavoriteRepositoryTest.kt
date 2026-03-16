@@ -1,14 +1,22 @@
 package pl.rockit.castociasto.feature.favorites.data
 
+import app.cash.turbine.test
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.test.runTest
+import pl.rockit.castociasto.core.events.AppEvent
+import pl.rockit.castociasto.core.events.AppEventBus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class FakeFavoriteRepositoryTest {
 
-    private val repository = FakeFavoriteRepository()
+    private val eventBus = FakeAppEventBus()
+    private val repository = FakeFavoriteRepository(eventBus)
 
     @Test
     fun `initial favorites contain items 1 and 3`() = runTest {
@@ -62,7 +70,22 @@ class FakeFavoriteRepositoryTest {
     fun `getFavoriteIds returns snapshot not live reference`() = runTest {
         val snapshot = repository.getFavoriteIds()
         repository.toggleFavorite("1")
-        // Snapshot should not be affected by subsequent mutations
         assertTrue(snapshot.contains("1"))
     }
+
+    @Test
+    fun `toggleFavorite emits FavoriteToggled event`() = runTest {
+        eventBus.events.test {
+            repository.toggleFavorite("5")
+            val event = awaitItem()
+            assertIs<AppEvent.FavoriteToggled>(event)
+            assertEquals("5", event.itemId)
+        }
+    }
+}
+
+private class FakeAppEventBus : AppEventBus {
+    private val _events = MutableSharedFlow<AppEvent>(extraBufferCapacity = 64)
+    override val events: SharedFlow<AppEvent> = _events.asSharedFlow()
+    override suspend fun emit(event: AppEvent) { _events.emit(event) }
 }

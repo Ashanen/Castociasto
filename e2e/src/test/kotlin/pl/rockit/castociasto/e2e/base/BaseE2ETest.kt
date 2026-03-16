@@ -3,11 +3,11 @@ package pl.rockit.castociasto.e2e.base
 import io.appium.java_client.android.AndroidDriver
 import io.appium.java_client.android.options.UiAutomator2Options
 import org.junit.After
+import org.junit.Assume
 import org.junit.Before
 import pl.rockit.castociasto.e2e.config.AppiumConfig
 import java.io.File
 import java.net.URI
-import java.time.Duration
 
 /**
  * Base class for all Appium E2E tests.
@@ -38,15 +38,23 @@ abstract class BaseE2ETest {
                 setApp(apkFile.absolutePath)
             }
 
-            // Performance: don't reset app state between tests in same class
             setNoReset(true)
+
+            // Compose testTag maps to raw resource-id (no package prefix)
+            setCapability("appium:disableIdLocatorAutocompletion", true)
+
+            // Always restart the app so tests start from the list screen
+            setCapability("appium:forceAppLaunch", true)
         }
 
-        driver = AndroidDriver(
-            URI(AppiumConfig.APPIUM_SERVER_URL).toURL(),
-            options,
-        )
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(AppiumConfig.IMPLICIT_WAIT))
+        try {
+            driver = AndroidDriver(
+                URI(AppiumConfig.APPIUM_SERVER_URL).toURL(),
+                options,
+            )
+        } catch (e: Exception) {
+            Assume.assumeNoException("Appium server not available, skipping E2E tests", e)
+        }
     }
 
     @After

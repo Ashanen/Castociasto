@@ -1,6 +1,7 @@
 package pl.rockit.castociasto.di
 
 import android.app.Application
+import android.content.Context
 import io.ktor.client.engine.HttpClientEngine
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -36,6 +37,7 @@ class KoinModuleVerificationTest : KoinTest {
         combined.verify(
             extraTypes = listOf(
                 HttpClientEngine::class,
+                Context::class,
             ),
         )
     }

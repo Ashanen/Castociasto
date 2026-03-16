@@ -23,6 +23,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.compose.viewmodel.koinViewModel
 import pl.rockit.castociasto.feature.items.ui.ListAction
@@ -46,8 +49,16 @@ fun ListScreen(
     }
 
     Scaffold(
+        modifier = Modifier.testTag("list_screen"),
         topBar = {
-            TopAppBar(title = { Text("Castociasto") })
+            TopAppBar(
+                title = {
+                    Text(
+                        "Castociasto",
+                        modifier = Modifier.semantics { testTag = "list_title" },
+                    )
+                },
+            )
         }
     ) { padding ->
         when {
@@ -70,14 +81,14 @@ fun ListScreen(
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    TextButton(onClick = { viewModel.onAction(ListAction.LoadItems) }) {
+                    TextButton(onClick = { viewModel.onAction(ListAction.Refresh) }) {
                         Text("Retry")
                     }
                 }
             }
             else -> {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding),
+                    modifier = Modifier.fillMaxSize().padding(padding).testTag("items_list"),
                 ) {
                     items(state.items, key = { it.id }) { item ->
                         ListItem(
@@ -85,6 +96,7 @@ fun ListScreen(
                             supportingContent = { Text(item.subtitle) },
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .testTag("item_${item.id}")
                                 .clickable { viewModel.onAction(ListAction.ItemClicked(item.id)) },
                         )
                         HorizontalDivider()

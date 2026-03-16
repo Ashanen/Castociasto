@@ -39,11 +39,13 @@ include(":shared:foundation")
 
 // Infrastructure
 include(":shared:infrastructure:networking")
+include(":shared:infrastructure:database")
 
 // Core (API contracts)
 include(":shared:core:items")
 include(":shared:core:categories")
 include(":shared:core:favorites")
+include(":shared:core:events")
 
 // Feature: Items
 include(":shared:feature:items:domain")
