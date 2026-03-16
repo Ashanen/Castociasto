@@ -32,15 +32,21 @@ graph TB
         App[shared:app - DI aggregation + iOS export]
 
         subgraph Feature1["feature:items"]
-            IU[ui] --> IDom[domain] --> IData[data]
+            IU[ui]
+            IDom[domain]
+            IData[data]
         end
 
         subgraph Feature2["feature:categories"]
-            CU[ui] --> CDom[domain] --> CData[data]
+            CU[ui]
+            CDom[domain]
+            CData[data]
         end
 
         subgraph Feature3["feature:favorites"]
-            FU[ui] --> FDom[domain] --> FData[data]
+            FU[ui]
+            FDom[domain]
+            FData[data]
         end
 
         subgraph Core["Core - Domain Contracts"]
