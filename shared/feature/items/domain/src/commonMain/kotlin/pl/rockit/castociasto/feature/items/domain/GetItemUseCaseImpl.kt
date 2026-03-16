@@ -5,7 +5,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import pl.rockit.castociasto.core.items.model.Item
 import pl.rockit.castociasto.core.items.repository.ItemRepository
-import pl.rockit.castociasto.core.items.usecase.GetItemUseCase
+import pl.rockit.castociasto.feature.items.domain.GetItemUseCase
 import pl.rockit.castociasto.core.favorites.repository.FavoriteRepository
 import pl.rockit.castociasto.foundation.exception.CastociastoException
 import pl.rockit.castociasto.foundation.extensions.flowSingle

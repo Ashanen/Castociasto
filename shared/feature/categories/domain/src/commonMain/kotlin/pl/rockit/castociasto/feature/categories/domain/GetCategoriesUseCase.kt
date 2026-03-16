@@ -1,4 +1,4 @@
-package pl.rockit.castociasto.core.categories.usecase
+package pl.rockit.castociasto.feature.categories.domain
 
 import kotlinx.coroutines.flow.Flow
 import pl.rockit.castociasto.core.categories.model.Category

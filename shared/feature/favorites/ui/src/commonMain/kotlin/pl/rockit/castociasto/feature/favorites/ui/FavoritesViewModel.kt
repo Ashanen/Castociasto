@@ -5,8 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
-import pl.rockit.castociasto.core.favorites.usecase.GetFavoritesUseCase
-import pl.rockit.castociasto.core.favorites.usecase.ToggleFavoriteUseCase
+import pl.rockit.castociasto.feature.favorites.domain.GetFavoritesUseCase
+import pl.rockit.castociasto.feature.favorites.domain.ToggleFavoriteUseCase
 import pl.rockit.castociasto.foundation.BaseViewModel
 import pl.rockit.castociasto.foundation.extensions.launchWith
 

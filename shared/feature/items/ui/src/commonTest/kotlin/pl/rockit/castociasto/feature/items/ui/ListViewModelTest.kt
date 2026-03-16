@@ -9,7 +9,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import pl.rockit.castociasto.core.items.model.Item
-import pl.rockit.castociasto.core.items.usecase.GetItemsUseCase
+import pl.rockit.castociasto.feature.items.domain.GetItemsUseCase
 import pl.rockit.castociasto.foundation.extensions.flowSingle
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

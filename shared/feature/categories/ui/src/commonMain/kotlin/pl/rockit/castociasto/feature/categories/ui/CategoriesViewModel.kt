@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
-import pl.rockit.castociasto.core.categories.usecase.GetCategoriesUseCase
+import pl.rockit.castociasto.feature.categories.domain.GetCategoriesUseCase
 import pl.rockit.castociasto.foundation.BaseViewModel
 import pl.rockit.castociasto.foundation.extensions.launchWith
 

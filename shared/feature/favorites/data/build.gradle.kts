@@ -9,6 +9,7 @@ android {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.shared.feature.favorites.domain)
             implementation(projects.shared.core.favorites)
         }
     }

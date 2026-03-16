@@ -1,4 +1,4 @@
-package pl.rockit.castociasto.core.favorites.usecase
+package pl.rockit.castociasto.feature.favorites.domain
 
 import kotlinx.coroutines.flow.Flow
 import pl.rockit.castociasto.core.items.model.Item

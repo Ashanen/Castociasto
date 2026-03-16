@@ -10,6 +10,7 @@ android {
 kotlin {
     sourceSets {
         commonMain.dependencies {
+            implementation(projects.shared.feature.items.domain)
             implementation(projects.shared.core.items)
             implementation(projects.shared.infrastructure.networking)
             implementation(libs.ktor.client.core)
