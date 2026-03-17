@@ -920,7 +920,7 @@ appium driver install xcuitest       # iOS
 
 2. Build the iOS app:
    ```bash
-   xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug build
+   xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
    ```
 3. Start Appium server in a separate terminal:
    ```bash

@@ -23,7 +23,7 @@ object AppiumConfig {
 
     val appPath: String
         get() = System.getenv("APP_PATH")
-            ?: "../iosApp/build/Build/Products/Debug-iphonesimulator/iosApp.app"
+            ?: "../iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app"
 
     val iosDeviceName: String
         get() = System.getenv("IOS_DEVICE_NAME") ?: "iPhone 17 Pro"
