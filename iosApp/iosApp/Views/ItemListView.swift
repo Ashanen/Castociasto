@@ -4,7 +4,7 @@ import Shared
 struct ItemListView: View {
     private let viewModel: ListViewModel
 
-    @State private var state = ListState(items: [], isLoading: false)
+    @State private var state = ListState(items: [], isLoading: false, error: nil)
     @State private var selectedItemId: String?
 
     init() {

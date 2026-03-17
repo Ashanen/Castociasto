@@ -6,7 +6,7 @@ struct ItemDetailView: View {
     private let itemId: String
 
     @Environment(\.dismiss) private var dismiss
-    @State private var state = DetailState(item: nil, isLoading: false)
+    @State private var state = DetailState(item: nil, isLoading: false, error: nil)
 
     init(itemId: String) {
         self.itemId = itemId
@@ -32,7 +32,6 @@ struct ItemDetailView: View {
         }
         .accessibilityIdentifier("detail_screen")
         .navigationTitle(state.item?.title ?? "")
-        .navigationBarBackButtonDisplayMode(.minimal)
         .task {
             viewModel.onAction(action: DetailActionLoadItem(id: itemId))
             for await newState in viewModel.uiState {
