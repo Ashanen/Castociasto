@@ -11,6 +11,7 @@ import org.junit.Before
 import pl.rockit.castociasto.e2e.config.AppiumConfig
 import pl.rockit.castociasto.e2e.config.Platform
 import java.io.File
+import java.net.ConnectException
 import java.net.URI
 
 /**
@@ -29,13 +30,22 @@ abstract class BaseE2ETest {
 
     @Before
     fun setUp() {
+        skipIfAppiumServerNotRunning()
+        driver = when (Platform.current()) {
+            Platform.ANDROID -> createAndroidDriver()
+            Platform.IOS -> createIOSDriver()
+        }
+    }
+
+    private fun skipIfAppiumServerNotRunning() {
         try {
-            driver = when (Platform.current()) {
-                Platform.ANDROID -> createAndroidDriver()
-                Platform.IOS -> createIOSDriver()
-            }
-        } catch (e: Exception) {
-            Assume.assumeNoException("Appium server not available, skipping E2E tests", e)
+            val url = URI(AppiumConfig.APPIUM_SERVER_URL + "/status").toURL()
+            val connection = url.openConnection()
+            connection.connectTimeout = 2_000
+            connection.readTimeout = 2_000
+            connection.getInputStream().close()
+        } catch (e: ConnectException) {
+            Assume.assumeTrue("Appium server not running at ${AppiumConfig.APPIUM_SERVER_URL} — skipping E2E tests", false)
         }
     }
 

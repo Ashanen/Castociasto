@@ -26,8 +26,32 @@ object AppiumConfig {
             ?: "../iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app"
 
     val iosDeviceName: String
-        get() = System.getenv("IOS_DEVICE_NAME") ?: "iPhone 17 Pro"
+        get() = System.getenv("IOS_DEVICE_NAME") ?: detectBootedSimulatorName()
 
     val iosPlatformVersion: String
-        get() = System.getenv("IOS_PLATFORM_VERSION") ?: "26.3"
+        get() = System.getenv("IOS_PLATFORM_VERSION") ?: detectBootedSimulatorVersion()
+
+    private fun detectBootedSimulatorVersion(): String {
+        return runSimctlCommand(
+            parseRegex = Regex("""--\s+iOS\s+([\d.]+)\s+--"""),
+            errorMessage = "Could not detect iOS simulator version. Boot a simulator or set IOS_PLATFORM_VERSION env var.",
+        )
+    }
+
+    private fun detectBootedSimulatorName(): String {
+        return runSimctlCommand(
+            parseRegex = Regex("""^\s+(.+?)\s+\([A-F0-9-]+\)\s+\(Booted\)""", RegexOption.MULTILINE),
+            errorMessage = "Could not detect booted simulator name. Boot a simulator or set IOS_DEVICE_NAME env var.",
+        )
+    }
+
+    private fun runSimctlCommand(parseRegex: Regex, errorMessage: String): String {
+        val process = ProcessBuilder("xcrun", "simctl", "list", "devices", "booted")
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        process.waitFor()
+        return parseRegex.find(output)?.groupValues?.get(1)
+            ?: error(errorMessage)
+    }
 }

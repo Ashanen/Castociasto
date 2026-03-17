@@ -44,11 +44,12 @@ class FavoritesViewModel(
 
     private fun toggle(itemId: String) {
         toggleFavorite(itemId)
+            .onStart { _uiState.update { it.copy(isLoading = true, error = null) } }
             .onEach { items ->
-                _uiState.update { it.copy(favorites = items) }
+                _uiState.update { it.copy(favorites = items, isLoading = false) }
             }
             .launchWith(viewModelScope) { error ->
-                _uiState.update { it.copy(error = error.message) }
+                _uiState.update { it.copy(isLoading = false, error = error.message) }
             }
     }
 }

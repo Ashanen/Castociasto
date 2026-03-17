@@ -13,10 +13,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-class FakeFavoriteRepositoryTest {
+class InMemoryFavoriteRepositoryTest {
 
     private val eventBus = FakeAppEventBus()
-    private val repository = FakeFavoriteRepository(eventBus)
+    private val repository = InMemoryFavoriteRepository(eventBus)
 
     @Test
     fun `initial favorites contain items 1 and 3`() = runTest {

@@ -1,6 +1,8 @@
 # Castociasto
 
-A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** with **MVI** pattern, targeting Android and iOS with fully shared business logic and native UI.
+A **Kotlin Multiplatform** (KMP) reference project demonstrating **Clean Architecture** with **MVI** pattern, targeting Android and iOS with fully shared business logic and native UI.
+
+This project serves as a **best practices template** for building production-grade KMP apps. Every architectural decision — module boundaries enforced at compile time, strict dependency inversion, sealed exception hierarchy, offline-first data sync, cross-feature event bus — is intentional and documented below.
 
 ## Table of Contents
 
@@ -19,6 +21,7 @@ A **Kotlin Multiplatform** (KMP) project implementing **Clean Architecture** wit
 - [Dependency Injection](#dependency-injection)
 - [Build Convention Plugins](#build-convention-plugins)
 - [Testing Strategy](#testing-strategy)
+- [How to Add a New Feature](#how-to-add-a-new-feature)
 - [Getting Started](#getting-started)
 - [Tech Stack](#tech-stack)
 
@@ -867,6 +870,108 @@ If Appium server is not running, E2E tests are skipped automatically (not failed
 
 ---
 
+## How to Add a New Feature
+
+Follow these steps to add a new feature module (e.g. `orders`) that follows the same architecture:
+
+### 1. Create core contracts
+
+Create `shared/core/orders/` with the convention plugin `castociasto.kmp.api`:
+
+```kotlin
+// shared/core/orders/src/commonMain/.../core/orders/model/Order.kt
+data class Order(val id: String, val name: String, val total: Double)
+
+// shared/core/orders/src/commonMain/.../core/orders/repository/OrderRepository.kt
+interface OrderRepository {
+    suspend fun getOrders(): List<Order>
+    fun observeOrders(): Flow<List<Order>>
+    suspend fun refresh()
+}
+```
+
+### 2. Create domain layer
+
+Create `shared/feature/orders/domain/` with `castociasto.kmp.domain`:
+
+```kotlin
+// Use case interface (public)
+fun interface GetOrdersUseCase {
+    operator fun invoke(): Flow<List<Order>>
+}
+
+// Implementation (internal)
+internal class GetOrdersUseCaseImpl(
+    private val repository: OrderRepository,
+) : GetOrdersUseCase {
+    override fun invoke() = flowSingle { repository.getOrders() }
+}
+
+// Koin module
+val ordersDomainModule = module {
+    factory<GetOrdersUseCase> { GetOrdersUseCaseImpl(get()) }
+}
+```
+
+### 3. Create data layer
+
+Create `shared/feature/orders/data/` with `castociasto.kmp.data`. Implement the repository and register it in Koin:
+
+```kotlin
+internal class OfflineFirstOrderRepository(
+    private val httpClient: HttpClient,
+    private val orderDao: OrderDao,
+) : OrderRepository { ... }
+
+val ordersDataModule = module {
+    single<OrderRepository> { OfflineFirstOrderRepository(get(), get()) }
+}
+```
+
+### 4. Create UI layer
+
+Create `shared/feature/orders/ui/` with `castociasto.kmp.ui`. Define the MVI contract and ViewModel:
+
+```kotlin
+data class OrdersState(val orders: List<Order> = emptyList(), val isLoading: Boolean = false, val error: String? = null)
+sealed interface OrdersAction { data object Load : OrdersAction }
+sealed interface OrdersSideEffect { ... }
+
+class OrdersViewModel(private val getOrders: GetOrdersUseCase)
+    : BaseViewModel<OrdersState, OrdersAction, OrdersSideEffect>() { ... }
+```
+
+### 5. Register modules
+
+Add all three modules to `settings.gradle.kts`:
+```kotlin
+include(":shared:core:orders")
+include(":shared:feature:orders:domain")
+include(":shared:feature:orders:data")
+include(":shared:feature:orders:ui")
+```
+
+Add Koin modules to `shared/app`:
+```kotlin
+val appModules = listOf(
+    ...,
+    ordersDataModule, ordersDomainModule, ordersUiModule,
+)
+```
+
+### 6. Add tests
+
+- **Domain**: Unit test each use case with a fake repository
+- **UI**: ViewModel test with fake use cases (follow `ListViewModelTest` pattern)
+- **Data**: Integration test with `MockEngine` + fake DAO
+
+### 7. Add platform screens
+
+- **Android**: Compose screen in `androidApp/` using `koinViewModel()`
+- **iOS**: SwiftUI view in `iosApp/` using `KoinHelper`
+
+---
+
 ## Getting Started
 
 ### 1. Install JDK 17+
@@ -989,6 +1094,8 @@ appium driver install xcuitest       # iOS
 | **DI** | Koin |
 | **Async** | Kotlin Coroutines + Flow |
 | **ViewModel** | AndroidX Lifecycle (multiplatform) |
+| **Swift interop** | SKIE (sealed types, flows in SwiftUI) |
 | **Testing** | kotlin.test, Turbine, Ktor MockEngine |
 | **E2E Testing** | Appium |
+| **CI** | GitHub Actions |
 | **Build** | Gradle with convention plugins |

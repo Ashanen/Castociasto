@@ -3,7 +3,7 @@ package pl.rockit.castociasto.feature.categories.data
 import pl.rockit.castociasto.core.categories.model.Category
 import pl.rockit.castociasto.core.categories.repository.CategoryRepository
 
-internal class FakeCategoryRepository : CategoryRepository {
+internal class InMemoryCategoryRepository : CategoryRepository {
 
     private val categories = listOf(
         Category(id = "1", name = "Bread", itemCount = 3),
