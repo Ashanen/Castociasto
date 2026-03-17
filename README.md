@@ -748,12 +748,14 @@ This means a `core` module **physically cannot** import Koin or Ktor — the dep
 graph TB
     subgraph "Testing Pyramid"
         E2E[E2E Tests - Appium]
-        INT[Integration Tests - Mock HTTP + Fake DAOs]
+        INTUI[UI Integration Tests - Robolectric + Compose]
+        INTDATA[Data Integration Tests - Mock HTTP + Fake DAOs]
         UNIT[Unit Tests - Fakes + Turbine]
     end
 
-    E2E ~~~ INT
-    INT ~~~ UNIT
+    E2E ~~~ INTUI
+    INTUI ~~~ INTDATA
+    INTDATA ~~~ UNIT
 ```
 
 | Layer | Test Type | Approach |
@@ -761,7 +763,8 @@ graph TB
 | **Core** | Unit tests | Event bus emission/subscription with Turbine |
 | **Domain** | Unit tests | Fake repositories, Turbine for Flow assertions |
 | **Data** | Integration tests | Ktor `MockEngine` + Fake DAOs for offline-first testing |
-| **UI** | ViewModel tests | Fake use cases, MVI state/effect assertions |
+| **UI (unit)** | ViewModel tests | Fake use cases, MVI state/effect assertions |
+| **UI (integration)** | Robolectric + Compose | Fake repositories, real use cases + ViewModels, full UI rendering |
 | **E2E** | End-to-end | Appium + UiAutomator2 (Android) / XCUITest (iOS) |
 
 ### E2E Testing with Appium
@@ -962,7 +965,8 @@ val appModules = listOf(
 ### 6. Add tests
 
 - **Domain**: Unit test each use case with a fake repository
-- **UI**: ViewModel test with fake use cases (follow `ListViewModelTest` pattern)
+- **UI (unit)**: ViewModel test with fake use cases (follow `ListScreenTest` pattern)
+- **UI (integration)**: Robolectric test with fake repositories wired through real use cases via Koin (follow `ListScreenIntegrationTest` pattern)
 - **Data**: Integration test with `MockEngine` + fake DAO
 
 ### 7. Add platform screens
