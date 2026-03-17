@@ -29,5 +29,5 @@ object AppiumConfig {
         get() = System.getenv("IOS_DEVICE_NAME") ?: "iPhone 17 Pro"
 
     val iosPlatformVersion: String
-        get() = System.getenv("IOS_PLATFORM_VERSION") ?: "26.0"
+        get() = System.getenv("IOS_PLATFORM_VERSION") ?: "26.3"
 }

@@ -937,7 +937,7 @@ appium driver install xcuitest       # iOS
 
    Optional env var overrides:
    ```bash
-   IOS_DEVICE_NAME="iPhone 17 Pro" IOS_PLATFORM_VERSION="26.0" APP_PATH="/path/to/iosApp.app" PLATFORM=ios ./gradlew :e2e:test
+   IOS_DEVICE_NAME="iPhone 17 Pro" IOS_PLATFORM_VERSION="26.3" APP_PATH="/path/to/iosApp.app" PLATFORM=ios ./gradlew :e2e:test
    ```
 
 > **Note:** Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests. If tests appear cached (instant "BUILD SUCCESSFUL"), add `--rerun` to force re-execution.
