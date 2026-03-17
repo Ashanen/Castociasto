@@ -42,10 +42,10 @@ struct ItemListView: View {
                     }
                     .accessibilityIdentifier("item_\(item.id)")
                 }
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("items_list")
             }
         }
-        .accessibilityIdentifier("list_screen")
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Castociasto")

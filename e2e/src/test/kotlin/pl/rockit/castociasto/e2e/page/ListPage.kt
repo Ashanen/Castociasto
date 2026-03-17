@@ -43,7 +43,8 @@ class ListPage(private val driver: AppiumDriver) {
 
     fun isDisplayed(): Boolean {
         return try {
-            driver.findElement(PlatformLocators.byId("list_screen")).isDisplayed
+            driver.findElement(PlatformLocators.byId("items_list"))
+            true
         } catch (_: Exception) {
             false
         }

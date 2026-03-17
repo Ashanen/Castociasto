@@ -79,7 +79,7 @@ abstract class BaseE2ETest {
                 setBundleId(AppiumConfig.IOS_BUNDLE_ID)
             }
 
-            setNoReset(true)
+            setNoReset(false)
             setCapability("appium:forceAppLaunch", true)
         }
         return IOSDriver(URI(AppiumConfig.APPIUM_SERVER_URL).toURL(), options)

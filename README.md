@@ -759,7 +759,7 @@ graph TB
 | **Domain** | Unit tests | Fake repositories, Turbine for Flow assertions |
 | **Data** | Integration tests | Ktor `MockEngine` + Fake DAOs for offline-first testing |
 | **UI** | ViewModel tests | Fake use cases, MVI state/effect assertions |
-| **E2E** | End-to-end | Appium + UiAutomator2 on emulators/devices |
+| **E2E** | End-to-end | Appium + UiAutomator2 (Android) / XCUITest (iOS) |
 
 ### E2E Testing with Appium
 
@@ -795,6 +795,32 @@ Jetpack Compose elements are invisible to UiAutomator by default. To make them d
 | `Icon(contentDescription = "Back")` | `content-desc = "Back"` | `AppiumBy.accessibilityId("Back")` |
 | `Text("visible text")` | `text = "visible text"` | `By.xpath("//..[@text='visible text']")` |
 
+#### SwiftUI + Appium: `accessibilityIdentifier` as `name`
+
+SwiftUI elements are located via `accessibilityIdentifier`, which maps to the XCUITest `name` attribute:
+
+1. **Add `.accessibilityIdentifier()` to views** you want to locate in tests:
+   ```swift
+   List(items) { ... }
+       .accessibilityElement(children: .contain)
+       .accessibilityIdentifier("items_list")
+   Text(item.title)
+       .accessibilityIdentifier("detail_title")
+   ```
+
+2. **Find elements in Appium** via `AppiumBy.accessibilityId()`:
+   ```kotlin
+   driver.findElement(AppiumBy.accessibilityId("items_list"))
+   driver.findElement(AppiumBy.accessibilityId("detail_title"))
+   ```
+
+| SwiftUI API | XCUITest attribute | Appium locator |
+|---|---|---|
+| `.accessibilityIdentifier("x")` | `name = "x"` | `AppiumBy.accessibilityId("x")` |
+| `Button("Back")` | `name = "Back"` | `AppiumBy.accessibilityId("Back")` |
+
+> **Gotcha:** SwiftUI `Group` is a transparent container — `.accessibilityIdentifier()` on a `Group` propagates to all its children, overriding their own identifiers. Use `.accessibilityElement(children: .contain)` on the actual content view to create a proper accessibility container that preserves child identifiers.
+
 #### Appium capabilities
 
 Two capabilities are critical for Compose:
@@ -813,7 +839,7 @@ e2e/src/test/kotlin/.../e2e/
 ├── page/
 │   ├── ListPage.kt            # waitForItemsToLoad(), tapFirstItem(), isDisplayed()
 │   └── DetailPage.kt          # waitForContent(), tapBack(), isDisplayed()
-└── test/ItemsFlowE2ETest.kt   # 5 user journey tests
+└── test/ItemsFlowE2ETest.kt   # 6 user journey tests
 ```
 
 Page methods return page objects for fluent chaining:

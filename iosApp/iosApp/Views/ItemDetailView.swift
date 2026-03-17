@@ -28,9 +28,10 @@ struct ItemDetailView: View {
                     Spacer()
                 }
                 .padding()
+                .accessibilityElement(children: .contain)
+                .accessibilityIdentifier("detail_screen")
             }
         }
-        .accessibilityIdentifier("detail_screen")
         .navigationTitle(state.item?.title ?? "")
         .task {
             viewModel.onAction(action: DetailActionLoadItem(id: itemId))
