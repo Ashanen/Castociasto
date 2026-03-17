@@ -918,15 +918,20 @@ appium driver install xcuitest       # iOS
    ```
    > **Tip:** Run `xcrun simctl list devices available` to see simulator names on your machine.
 
-2. Build the iOS app:
+2. **(Corporate proxy only)** If behind Zscaler or similar TLS-intercepting proxy, install the root CA on the simulator:
+   ```bash
+   security find-certificate -a -p -c "Zscaler Root CA" /Library/Keychains/System.keychain > /tmp/zscaler.pem
+   xcrun simctl keychain booted add-root-cert /tmp/zscaler.pem
+   ```
+3. Build the iOS app:
    ```bash
    xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
    ```
-3. Start Appium server in a separate terminal:
+4. Start Appium server in a separate terminal:
    ```bash
    appium
    ```
-4. Run the tests:
+5. Run the tests:
    ```bash
    PLATFORM=ios ./gradlew :e2e:test
    ```
