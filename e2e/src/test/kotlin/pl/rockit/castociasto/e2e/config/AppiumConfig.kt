@@ -26,8 +26,8 @@ object AppiumConfig {
             ?: "../iosApp/build/Build/Products/Debug-iphonesimulator/iosApp.app"
 
     val iosDeviceName: String
-        get() = System.getenv("IOS_DEVICE_NAME") ?: "iPhone 16"
+        get() = System.getenv("IOS_DEVICE_NAME") ?: "iPhone 17 Pro"
 
     val iosPlatformVersion: String
-        get() = System.getenv("IOS_PLATFORM_VERSION") ?: "18.0"
+        get() = System.getenv("IOS_PLATFORM_VERSION") ?: "26.0"
 }

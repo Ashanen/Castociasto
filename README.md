@@ -763,7 +763,7 @@ graph TB
 
 ### E2E Testing with Appium
 
-End-to-end tests live in the `e2e/` module and use **Appium** with the **UiAutomator2** driver to automate the Android app on real emulators or devices.
+End-to-end tests live in the `e2e/` module and use **Appium** to automate both Android and iOS apps on emulators/simulators or real devices.
 
 #### Compose + Appium: `testTag` as `resource-id`
 
@@ -913,9 +913,11 @@ appium driver install xcuitest       # iOS
 
 1. Boot an iOS simulator:
    ```bash
-   xcrun simctl boot "iPhone 16"
+   xcrun simctl boot "iPhone 17 Pro"
    open -a Simulator
    ```
+   > **Tip:** Run `xcrun simctl list devices available` to see simulator names on your machine.
+
 2. Build the iOS app:
    ```bash
    xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Debug build
@@ -928,9 +930,17 @@ appium driver install xcuitest       # iOS
    ```bash
    PLATFORM=ios ./gradlew :e2e:test
    ```
-   Optional overrides: `IOS_DEVICE_NAME`, `IOS_PLATFORM_VERSION`, `APP_PATH`.
+   or equivalently via Gradle system property:
+   ```bash
+   ./gradlew :e2e:test -Dplatform=ios
+   ```
 
-Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests.
+   Optional env var overrides:
+   ```bash
+   IOS_DEVICE_NAME="iPhone 17 Pro" IOS_PLATFORM_VERSION="26.0" APP_PATH="/path/to/iosApp.app" PLATFORM=ios ./gradlew :e2e:test
+   ```
+
+> **Note:** Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests. If tests appear cached (instant "BUILD SUCCESSFUL"), add `--rerun` to force re-execution.
 
 ---
 

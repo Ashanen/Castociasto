@@ -20,5 +20,5 @@ dependencies {
 }
 
 tasks.test {
-    systemProperty("platform", System.getProperty("platform") ?: "android")
+    systemProperty("platform", System.getProperty("platform") ?: System.getenv("PLATFORM") ?: "android")
 }
