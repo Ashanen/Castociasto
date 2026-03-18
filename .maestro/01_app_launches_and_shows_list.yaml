@@ -1,0 +1,10 @@
+# Mirrors Appium: appLaunchesAndShowsListScreen()
+# Verifies the app launches to the list screen with the correct title.
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- assertVisible:
+    id: "list_title"
+    text: "Castociasto"

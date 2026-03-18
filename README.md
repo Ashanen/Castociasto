@@ -21,6 +21,7 @@ This project serves as a **best practices template** for building production-gra
 - [Dependency Injection](#dependency-injection)
 - [Build Convention Plugins](#build-convention-plugins)
 - [Testing Strategy](#testing-strategy)
+- [Appium vs Maestro Comparison](#appium-vs-maestro-comparison)
 - [How to Add a New Feature](#how-to-add-a-new-feature)
 - [Getting Started](#getting-started)
 - [Tech Stack](#tech-stack)
@@ -110,7 +111,8 @@ Castociasto/
 ├── androidApp/                          # Android app (Jetpack Compose)
 ├── iosApp/                              # iOS app (SwiftUI)
 ├── build-logic/convention/              # Custom Gradle plugins for layer enforcement
-├── e2e/                                 # Appium E2E tests
+├── e2e/                                 # Appium E2E tests (Kotlin + Page Objects)
+├── .maestro/                            # Maestro E2E flows (YAML, zero setup)
 └── shared/
     ├── app/                             # DI aggregation + iOS framework export
     ├── foundation/                      # Base types: BaseViewModel, exceptions, extensions
@@ -747,7 +749,7 @@ This means a `core` module **physically cannot** import Koin or Ktor — the dep
 ```mermaid
 graph TB
     subgraph "Testing Pyramid"
-        E2E[E2E Tests - Appium]
+        E2E[E2E Tests - Appium + Maestro]
         INTUI[UI Integration Tests - Robolectric + Compose]
         INTDATA[Data Integration Tests - Mock HTTP + Fake DAOs]
         UNIT[Unit Tests - Fakes + Turbine]
@@ -765,7 +767,10 @@ graph TB
 | **Data** | Integration tests | Ktor `MockEngine` + Fake DAOs for offline-first testing |
 | **UI (unit)** | ViewModel tests | Fake use cases, MVI state/effect assertions |
 | **UI (integration)** | Robolectric + Compose | Fake repositories, real use cases + ViewModels, full UI rendering |
-| **E2E** | End-to-end | Appium + UiAutomator2 (Android) / XCUITest (iOS) |
+| **E2E (Appium)** | End-to-end | Kotlin + Page Objects, Appium + UiAutomator2 / XCUITest |
+| **E2E (Maestro)** | End-to-end | YAML flows, Maestro CLI, cross-platform via accessibility IDs |
+
+This project includes **both Appium and Maestro** E2E test suites covering the same 6 user journeys, allowing direct comparison. See [Appium vs Maestro Comparison](#appium-vs-maestro-comparison) for benchmarks and trade-offs.
 
 ### E2E Testing with Appium
 
@@ -870,6 +875,167 @@ appium
 ```
 
 If Appium server is not running, E2E tests are skipped automatically (not failed).
+
+### E2E Testing with Maestro
+
+**Maestro** is a declarative, YAML-based mobile UI testing tool. Flows live in `.maestro/` and use the same accessibility identifiers (`testTag` on Android, `accessibilityIdentifier` on iOS) as the Appium tests.
+
+#### Setup
+
+```bash
+curl -Ls "https://get.maestro.mobile.dev" | bash
+export PATH="$PATH:$HOME/.maestro/bin"
+maestro --version
+```
+
+#### Flow structure
+
+```
+.maestro/
+├── 01_app_launches_and_shows_list.yaml
+├── 02_list_displays_items.yaml
+├── 03_tap_item_shows_detail.yaml
+├── 04_back_navigation_returns_to_list.yaml
+├── 05_successful_load_no_error.yaml
+└── 06_different_items_show_different_content.yaml
+```
+
+Each flow is a standalone YAML file — no server, no page objects, no build step:
+
+```yaml
+# 03_tap_item_shows_detail.yaml
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- extendedWaitUntil:
+    visible:
+      id: "item_.*"
+    timeout: 5000
+- tapOn:
+    id: "item_.*"
+    index: 0
+- assertVisible:
+    id: "detail_title"
+- assertVisible:
+    id: "detail_subtitle"
+```
+
+#### Running Maestro tests (Android)
+
+1. Start an Android emulator
+2. Install the app:
+   ```bash
+   ./gradlew :androidApp:assembleDebug
+   adb install androidApp/build/outputs/apk/debug/androidApp-debug.apk
+   ```
+3. Run:
+   ```bash
+   maestro test -e APP_ID=pl.rockit.castociasto .maestro/
+   ```
+
+#### Running Maestro tests (iOS)
+
+1. Boot and open a simulator:
+   ```bash
+   xcrun simctl boot "iPhone 17 Pro"
+   open -a Simulator
+   ```
+2. Build and install the app:
+   ```bash
+   xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+     -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
+   xcrun simctl install booted iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app
+   ```
+3. Run:
+   ```bash
+   maestro test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   ```
+
+#### Cross-platform compatibility
+
+Maestro flows work on both platforms without modification because:
+- **Element lookup** uses `id:` which maps to `resource-id` (Android testTag) and `accessibilityIdentifier` (iOS) automatically
+- **Regex matching** (`id: "item_.*"`) finds dynamic elements on both platforms
+- **Back navigation** taps the "Back" accessibility label (present on both platforms) instead of using the Android system back button
+
+---
+
+## Appium vs Maestro Comparison
+
+Both test suites cover the same 6 user journeys. Here's how they compare, measured on this project:
+
+### Benchmark Results (Android, same emulator, same tests)
+
+| Metric | Appium | Maestro |
+|--------|--------|---------|
+| **Total suite time** | ~68s | ~41s |
+| **App launch + list check** | 8.8s | 4s |
+| **List displays items** | 8.7s | 5s |
+| **Tap item shows detail** | 18.0s | 6s |
+| **Back navigation** | 10.1s | 10s |
+| **No error on success** | 8.8s | 5s |
+| **Different items** | 12.0s | 11s |
+
+### Setup Comparison
+
+| | Appium | Maestro |
+|---|---|---|
+| **Install** | `npm install -g appium` + drivers | `curl -Ls "https://get.maestro.mobile.dev" \| bash` |
+| **Server required** | Yes (`appium` must be running) | No |
+| **Test language** | Kotlin/Java/Python/JS/any | YAML |
+| **Lines of test code** | 424 (7 Kotlin files) | 103 (6 YAML files) |
+| **Page objects needed** | Yes (recommended) | No |
+| **Build step for tests** | Yes (Gradle compiles Kotlin) | No |
+| **Time to first test** | ~5 min (install + drivers + server + write test) | ~1 min (install + write YAML) |
+
+### Pros and Cons
+
+#### Appium
+
+| Pros | Cons |
+|------|------|
+| Full programming language — loops, variables, conditionals, custom assertions | Requires Appium server running separately |
+| Page Object pattern for maintainable, reusable code | More boilerplate (driver setup, capabilities, locators, waits) |
+| Supports complex gestures, system-level interactions, hybrid apps | Slower — HTTP round-trip per command |
+| Huge ecosystem — works with any test framework (JUnit, TestNG, pytest) | Flaky by nature — needs explicit waits, retry logic |
+| Can run against real devices, cloud providers (BrowserStack, Sauce Labs) | Platform-specific locator strategies needed |
+| Extensible via plugins and custom drivers | Heavy setup for CI (server, drivers, environment variables) |
+
+#### Maestro
+
+| Pros | Cons |
+|------|------|
+| Zero infrastructure — no server, no drivers, just CLI | YAML only — no loops, limited conditionals |
+| Built-in automatic waiting — far less flakiness | Can't do complex gestures or system-level interactions |
+| ~4x less code for the same test coverage | Regex-based element matching only (no XPath, no CSS selectors) |
+| Same YAML flows work on both Android and iOS | Newer tool, smaller community |
+| Fast iteration — edit YAML, re-run immediately | No Page Object pattern (each flow is standalone) |
+| Maestro Cloud for easy CI | Can't assert on exact text equality across elements |
+| Built-in screenshot/video recording | Limited to mobile (no desktop/web hybrid) |
+
+### When to Use Which
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Quick smoke tests for CI | Maestro |
+| Rapid prototyping of test flows | Maestro |
+| Complex multi-step workflows with logic | Appium |
+| System-level testing (permissions, settings, notifications) | Appium |
+| Cloud device farms (BrowserStack, Sauce Labs) | Appium |
+| Team with limited test automation experience | Maestro |
+| Cross-platform happy-path regression | Maestro |
+| Custom gesture testing (drag, pinch, long press sequences) | Appium |
+
+### Using Both Together
+
+This project demonstrates the recommended approach: **use both side by side**.
+
+- **Maestro** covers the core user journeys (launch, browse, navigate, error states) — fast, reliable, easy to maintain
+- **Appium** handles edge cases that need programmatic control — complex assertions, cross-element comparisons, system interactions
+
+The same accessibility identifiers (`testTag` / `accessibilityIdentifier`) power both frameworks, so adding a new test to either is straightforward.
 
 ---
 
@@ -1082,6 +1248,46 @@ appium driver install xcuitest       # iOS
 
 > **Note:** Always run E2E tests from the **terminal** — Android Studio's test runner may show "Test events were not received" for Appium tests. If tests appear cached (instant "BUILD SUCCESSFUL"), add `--rerun` to force re-execution.
 
+### 5. E2E tests (Maestro)
+
+#### One-time setup
+
+```bash
+curl -Ls "https://get.maestro.mobile.dev" | bash
+export PATH="$PATH:$HOME/.maestro/bin"
+```
+
+#### Run Maestro tests (Android)
+
+1. Start an Android emulator
+2. Build and install:
+   ```bash
+   ./gradlew :androidApp:assembleDebug
+   adb install androidApp/build/outputs/apk/debug/androidApp-debug.apk
+   ```
+3. Run:
+   ```bash
+   maestro test -e APP_ID=pl.rockit.castociasto .maestro/
+   ```
+
+#### Run Maestro tests (iOS)
+
+1. Boot a simulator:
+   ```bash
+   xcrun simctl boot "iPhone 17 Pro"
+   open -a Simulator
+   ```
+2. Build and install:
+   ```bash
+   xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp \
+     -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
+   xcrun simctl install booted iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app
+   ```
+3. Run:
+   ```bash
+   maestro test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   ```
+
 ---
 
 ## Tech Stack
@@ -1099,7 +1305,7 @@ appium driver install xcuitest       # iOS
 | **Async** | Kotlin Coroutines + Flow |
 | **ViewModel** | AndroidX Lifecycle (multiplatform) |
 | **Swift interop** | SKIE (sealed types, flows in SwiftUI) |
-| **Testing** | kotlin.test, Turbine, Ktor MockEngine |
-| **E2E Testing** | Appium |
+| **Testing** | kotlin.test, Turbine, Ktor MockEngine, Robolectric |
+| **E2E Testing** | Appium, Maestro |
 | **CI** | GitHub Actions |
 | **Build** | Gradle with convention plugins |

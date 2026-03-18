@@ -1,0 +1,19 @@
+# Mirrors Appium: backNavigationReturnsToList()
+# Navigates to detail, then back, and verifies list is displayed again.
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- extendedWaitUntil:
+    visible:
+      id: "item_.*"
+    timeout: 5000
+- tapOn:
+    id: "item_.*"
+    index: 0
+- assertVisible:
+    id: "detail_title"
+- tapOn: "Back"
+- assertVisible:
+    id: "items_list"

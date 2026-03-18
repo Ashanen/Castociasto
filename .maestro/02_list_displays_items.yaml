@@ -1,0 +1,11 @@
+# Mirrors Appium: listScreenDisplaysItems()
+# Verifies the list loads and displays at least one item.
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- extendedWaitUntil:
+    visible:
+      id: "item_.*"
+    timeout: 5000

@@ -1,0 +1,13 @@
+# Mirrors Appium: successfulLoadDoesNotShowError()
+# Verifies error state is not visible when items load successfully.
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- extendedWaitUntil:
+    visible:
+      id: "item_.*"
+    timeout: 5000
+- assertNotVisible:
+    id: "list_error"

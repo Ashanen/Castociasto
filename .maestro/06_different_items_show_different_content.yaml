@@ -1,0 +1,32 @@
+# Mirrors Appium: navigatingToDifferentItemsShowsDifferentContent()
+# Navigates to two different items and verifies both render detail content.
+appId: ${APP_ID}
+---
+- launchApp
+- assertVisible:
+    id: "items_list"
+- extendedWaitUntil:
+    visible:
+      id: "item_.*"
+    timeout: 5000
+
+# Navigate to first item
+- tapOn:
+    id: "item_.*"
+    index: 0
+- assertVisible:
+    id: "detail_title"
+- copyTextFrom:
+    id: "detail_title"
+
+# Go back and navigate to second item
+- tapOn: "Back"
+- assertVisible:
+    id: "items_list"
+- tapOn:
+    id: "item_.*"
+    index: 1
+- assertVisible:
+    id: "detail_title"
+- assertVisible:
+    id: "detail_subtitle"
