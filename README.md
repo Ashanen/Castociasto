@@ -934,6 +934,11 @@ appId: ${APP_ID}
    ```bash
    maestro test -e APP_ID=pl.rockit.castociasto .maestro/
    ```
+   If multiple emulators are connected, specify one:
+   ```bash
+   adb devices                          # lists e.g. emulator-5554, emulator-5556
+   maestro --device emulator-5554 test -e APP_ID=pl.rockit.castociasto .maestro/
+   ```
 
 #### Running Maestro tests (iOS)
 
@@ -948,10 +953,33 @@ appId: ${APP_ID}
      -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
    xcrun simctl install booted iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app
    ```
-3. Run:
+3. Find the simulator UUID:
    ```bash
-   maestro test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   xcrun simctl list devices booted
    ```
+   This outputs something like:
+   ```
+   == Devices ==
+   -- iOS 26.3 --
+       iPhone 17 Pro (2628341C-3D17-46D6-811E-2DE75C6F25BF) (Booted)
+   ```
+   Copy the UUID (the part in parentheses, e.g. `2628341C-3D17-46D6-811E-2DE75C6F25BF`).
+
+4. Run with `--device <UUID>`:
+   ```bash
+   maestro --device <UUID> test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   ```
+   For example:
+   ```bash
+   maestro --device 2628341C-3D17-46D6-811E-2DE75C6F25BF test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   ```
+
+> **Important:** The `--device` flag goes **before** `test`, and `-e` goes **after** `test`. Maestro needs the device UUID to target the correct iOS simulator — without it, it may pick up an Android device or fail to connect.
+
+> **Tip:** If you get "Unable to launch app", verify the bundle ID is correct:
+> ```bash
+> xcrun simctl listapps booted | grep CFBundleIdentifier | grep -v com.apple
+> ```
 
 #### Cross-platform compatibility
 
@@ -1283,9 +1311,12 @@ export PATH="$PATH:$HOME/.maestro/bin"
      -sdk iphonesimulator -configuration Debug -derivedDataPath iosApp/build build
    xcrun simctl install booted iosApp/build/Build/Products/Debug-iphonesimulator/Castociasto.app
    ```
-3. Run:
+3. Find simulator UUID and run:
    ```bash
-   maestro test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
+   # Find UUID of booted simulator
+   xcrun simctl list devices booted
+   # Copy the UUID, then run:
+   maestro --device <UUID> test -e APP_ID=pl.rockit.castociasto.Castociasto .maestro/
    ```
 
 ---
